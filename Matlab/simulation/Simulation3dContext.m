@@ -1,4 +1,4 @@
-classdef Simulation2dContext < handle
+classdef Simulation3dContext < handle
     %--------------
     %This is a context class for the whole simulation.
     %--------------
@@ -6,7 +6,7 @@ classdef Simulation2dContext < handle
         roomModel;
         sourceModel;
         receiverModel;
-        drawingContext;
+        %drawingContext;
         settings;
         distanceThreshold;
         speedOfSound;
@@ -18,25 +18,16 @@ classdef Simulation2dContext < handle
         rightEarFilter;
     end
     %--------------
-    %Constants
-    %--------------
-    properties (Constant = true, GetAccess = 'private')
-        DRAWING_CANVAS_SIZE_X = 2000;
-        DRAWING_CANVAS_SIZE_Y = 2000;
-        DRAWING_LINE_WIDTH = 5;
-    end
-    %-----------------------------------------------------------
-    %--------------
     %Public Methods
     %--------------
     methods (Access = 'public')
-        function this = Simulation2dContext()
+        function this = Simulation3dContext()
             %init all properties
             this.initializeFilters();
             this.initSettings();
             
-            this.roomModel = Room2dModel(this.settings.roomModel.vertices, ...
-                                         this.settings.roomModel.lines, ...
+            this.roomModel = Room3dModel(this.settings.roomModel.vertices, ...
+                                         this.settings.roomModel.faces, ...
                                          this.settings.roomModel.materials, ...
                                          this.settings.roomModel.medium);
                                      
@@ -199,14 +190,18 @@ classdef Simulation2dContext < handle
     %--------------
     methods (Access = 'private')
         function initSettings(this)
-            this.settings.drawing.canvasSizeX = this.DRAWING_CANVAS_SIZE_X;
-            this.settings.drawing.canvasSizeY = this.DRAWING_CANVAS_SIZE_Y;
-            this.settings.drawing.lineWidth = this.DRAWING_LINE_WIDTH;
-            
-            this.settings.roomModel.vertices = [[50 100] [1250 100] [1250 1600] [50 1600]]; 
-            this.settings.roomModel.lines = [1 2; 2 3; 3 4; 4 1];
+            this.settings.roomModel.vertices = [[50 100 0]; [1250 100 0]; [1250 1600 0]; [50 1600 0]; [50 100 600]; [1250 100 600]; [1250 1600 600]; [50 1600 600]];
+            this.settings.roomModel.faces = [1 2 3; 1 3 4; 1 6 2; 1 5 6; 2 6 3; 3 6 7; 3 7 4; 4 7 8; 5 7 6; 5 8 7; 1 4 5; 4 8 5];
             material = Material('wood', [.7 .5 0], this.filtersMap('woodenWall'));
             this.settings.roomModel.materials = [material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
+                                                material, ...
                                                 material, ...
                                                 material, ...
                                                 material];
@@ -214,20 +209,20 @@ classdef Simulation2dContext < handle
             
             this.settings.sourceModel.positionX = 1000;
             this.settings.sourceModel.positionY = 1400;
-            this.settings.sourceModel.positionVector = Vec2d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY);
-            this.settings.sourceModel.directionAngle = 180; %in degrees
-            this.settings.sourceModel.realSize = 0.5; %in meters 
-            this.settings.sourceModel.soundPowerLevel = 100; % dB
-            this.settings.sourceModel.directivityFactor = 1; %Full sphere radiation (Q = 1)
+            this.settings.sourcemodel.positionZ = 300; %zmieniæ podawanie pozycji - w metrach
+            this.settings.sourceModel.positionVector = Vec3d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY, this.settings.sourceModel.positionZ);
+            this.settings.sourceModel.directionAngle.elevation = 0; %in degrees
+            this.settings.sourceModel.directionAngle.azimuth = 0; 
+            this.settings.sourceModel.realSize = 0.5; %in meters
             
-
             this.settings.receiverModel.positionX = 200;
             this.settings.receiverModel.positionY = 250;
-            this.settings.receiverModel.positionVector = Vec2d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY);
-            this.settings.receiverModel.directionAngle = 40; %in degrees
+            this.settings.receiverModel.positionZ = 300;
+            this.settings.receiverModel.positionVector = Vec3d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY, this.settings.receiverModel.positionZ);
+            this.settings.receiverModel.directionAngle.elevation = 0;
+            this.settings.receiverModel.directionAngle.azimuth = 40; %in degrees
             this.settings.receiverModel.realSize = 0.4; %in meters
             
-            this.settings.simulation.energyThreshold = 5;
             this.settings.simulation.temperature = 21; %Celsius
             this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
             this.settings.simulation.timeThreshold = 3; %seconds
@@ -245,13 +240,13 @@ classdef Simulation2dContext < handle
         
         function checkSceneSanity(this)
             %(canvas size/room position) sanity
-            vertices = this.settings.roomModel.vertices;
-            drawingSettings = this.settings.drawing;
-            for i = 1:2:length(vertices)
-                if (vertices(i) >= drawingSettings.canvasSizeX) || (vertices(i + 1) >= drawingSettings.canvasSizeY)
-                    error('Scene sanity check failed. There are vertices placed out of the scene.');
-                end
-            end
+            %vertices = this.settings.roomModel.vertices;
+            %drawingSettings = this.settings.drawing;
+            %for i = 1:2:length(vertices)
+            %    if (vertices(i) >= drawingSettings.canvasSizeX) || (vertices(i + 1) >= drawingSettings.canvasSizeY)
+            %        error('Scene sanity check failed. There are vertices placed out of the scene.');
+            %    end
+            %end
             %(room/source position) sanity
             %TO ADD POINT IN POLYGON CHECK
             %(room/receiver position) sanity
