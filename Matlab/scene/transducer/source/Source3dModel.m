@@ -43,7 +43,7 @@ classdef Source3dModel < handle
             end
             
             directionVectors = Source3dModel.calcParticlesDirections(this.numberOfParticles, false);
-            
+            %directionVectors = Vec3d(0, -1, 0);
             for i = 1:length(directionVectors)
                 particle = SoundParticle(this, directionVectors(i));
                 this.particles(i) = particle;
@@ -114,8 +114,8 @@ classdef Source3dModel < handle
                 z = sin(phi) * r;
                 
                 directionVectors(i+1) = Vec3d(x, y, z);
-                fprintf(1, 'Length of calculated dir vector: %d\n', directionVectors(i+1).getLength());
-                directionVectors(i+1).print();
+                %fprintf(1, 'Length of calculated dir vector: %d\n', directionVectors(i+1).getLength());
+                %directionVectors(i+1).print();
             end
         end
     end

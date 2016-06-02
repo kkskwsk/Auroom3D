@@ -16,15 +16,19 @@ classdef Simulation3dContext < handle
         
         leftEarFilter;
         rightEarFilter;
+        
+        hrtf;
     end
     %--------------
     %Public Methods
     %--------------
     methods (Access = 'public')
-        function this = Simulation3dContext()
+        function this = Simulation3dContext(numberOfParticles, hrtf)
             %init all properties
             this.initializeFilters();
             this.initSettings();
+            
+            this.hrtf = hrtf;
             
             this.roomModel = Room3dModel(this.settings.roomModel.vertices, ...
                                          this.settings.roomModel.faces, ...
@@ -34,18 +38,20 @@ classdef Simulation3dContext < handle
             this.sourceModel = Source3dModel(this.settings.sourceModel.positionVector, ...
                                              this.settings.sourceModel.directionAngle.azimuth, ...
                                              this.settings.sourceModel.directionAngle.elevation);
-            this.sourceModel.setNumberOfParticles(100);
+            this.sourceModel.setNumberOfParticles(numberOfParticles);
             
             this.receiverModel = Receiver3dModel(this.settings.receiverModel.positionVector, ...
                                                  this.settings.receiverModel.directionAngle.azimuth, ...
                                                  this.settings.receiverModel.directionAngle.elevation, ...
-                                                 this.settings.receiverModel.realSize);
+                                                 this.settings.receiverModel.realSize,...
+                                                 this.hrtf);
 %             this.drawingContext = Drawing2dContext(this.settings.drawing.canvasSizeX, ... 
 %                                                    this.settings.drawing.canvasSizeY, ...
 %                                                    this.settings.drawing.lineWidth);
             this.distanceThreshold = this.settings.simulation.distanceThreshold;
             this.speedOfSound = this.settings.simulation.speedOfSound;
         end
+        
         
 %         function drawScene(this)
 %             this.roomModel.draw(this.drawingContext); % funkcje powinny sie nazywac po prostu "draw"
@@ -119,53 +125,6 @@ classdef Simulation3dContext < handle
             result = false;
         end
         
-        function auralize(this, filename)
-            frameLength = this.settings.dsp.frameLength;
-            fileReader = dsp.AudioFileReader(filename, 'SamplesPerFrame', frameLength);
-            i = info(fileReader);
-            if (i.NumChannels ~= 1)
-                error('To many channels. Cannot auralize a stereo sound. First convert to mono.');
-            end
-            
-            %TO DO: Check how to choose a device? Speakers/file. It is
-            %necessary to choose if the sound should be played or just
-            %saved to a new file.
-            deviceWriter = audioDeviceWriter('SampleRate', fileReader.SampleRate);
-            
-            %I assume that both ears' impulse responses are of equal
-            %length.
-            impulseResponseLength = length(this.leftEarFilter.getCoeffsB());
-            
-            if (impulseResponseLength ~= 1)
-                overlapLength = impulseResponseLength - 1;
-                leftEarOverlap  = zeros(overlapLength, 1);
-                rightEarOverlap = zeros(overlapLength, 1);
-                
-                while ~isDone(fileReader)
-                    rightEarOverlap = [rightEarOverlap; zeros(frameLength - overlapLength, 1)];
-                    leftEarOverlap = [leftEarOverlap; zeros(frameLength - overlapLength, 1)];
-                    chunk = step(fileReader);
-                    processedLeftEarChunk = Dsp.filter(chunk, this.leftEarFilter);
-                    processedRightEarChunk = Dsp.filter(chunk, this.rightEarFilter);
-                    chunkToPlay(:,1) = leftEarOverlap(1:frameLength) + processedLeftEarChunk(1:frameLength);
-                    chunkToPlay(:,2) = rightEarOverlap(1:frameLength) + processedRightEarChunk(1:frameLength);
-                    leftEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
-                    rightEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
-                    leftEarOverlap = processedLeftEarChunk(frameLength+1:end) + leftEarOverlap(frameLength+1:end);
-                    rightEarOverlap = processedRightEarChunk(frameLength+1:end) + rightEarOverlap(frameLength+1:end);
-                    play(deviceWriter, chunkToPlay);
-                end
-            else
-                while ~isDone(fileReader)
-                    chunk = step(fileReader);
-                    chunkToPlay(:,1) = Dsp.filter(chunk, this.leftEarFilter);
-                    chunkToPlay(:,2) = Dsp.filter(chunk, this.rightEarFilter);
-                    play(deviceWriter, chunkToPlay);
-                end
-            end
-            
-        end
-        
         %Getters
         function roomModel = getRoomModel(this)
             roomModel = this.roomModel;
@@ -186,6 +145,12 @@ classdef Simulation3dContext < handle
         function settings = getSettings(this)
             settings = this.settings;
         end
+        
+        function [leftEarFilter, rightEarFilter] = getFilters(this)
+            leftEarFilter = this.leftEarFilter;
+            rightEarFilter = this.rightEarFilter;
+        end
+                
     end
     %--------------
     %Private Methods
@@ -209,8 +174,8 @@ classdef Simulation3dContext < handle
                                                 material];
             this.settings.roomModel.medium = 'air';
             
-            this.settings.sourceModel.positionX = 1000;
-            this.settings.sourceModel.positionY = 1400;
+            this.settings.sourceModel.positionX = 900;
+            this.settings.sourceModel.positionY = 1000;
             this.settings.sourceModel.positionZ = 300; %zmieniæ podawanie pozycji - w metrach
             this.settings.sourceModel.positionVector = Vec3d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY, this.settings.sourceModel.positionZ);
             this.settings.sourceModel.directionAngle.elevation = 0; %in degrees
@@ -223,11 +188,11 @@ classdef Simulation3dContext < handle
             this.settings.receiverModel.positionVector = Vec3d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY, this.settings.receiverModel.positionZ);
             this.settings.receiverModel.directionAngle.elevation = 0;
             this.settings.receiverModel.directionAngle.azimuth = 40; %in degrees
-            this.settings.receiverModel.realSize = 0.5; %in meters
+            this.settings.receiverModel.realSize = 2; %in meters
             
             this.settings.simulation.temperature = 21; %Celsius
             this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
-            this.settings.simulation.timeThreshold = 0.7; %seconds
+            this.settings.simulation.timeThreshold = 3; %seconds
             this.settings.simulation.distanceThreshold = this.settings.simulation.timeThreshold * this.settings.simulation.speedOfSound; 
             this.settings.simulation.sampleRate = 44100;
             
@@ -253,6 +218,60 @@ classdef Simulation3dContext < handle
             %TO ADD POINT IN POLYGON CHECK
             %(room/receiver position) sanity
             %(receiver/source position) sanity - near field border
+        end
+    end
+    
+    methods (Access = 'public', Static = true)
+        function hrtf = loadHrtf()
+            tic
+            hrtf = Hrtf();
+            fprintf(1, 'Time of loading hrtf: %d [sec]\n', toc);
+        end
+        function auralize(filename, leftEarFilter, rightEarFilter)
+            frameLength = 4096*2;
+            fileReader = dsp.AudioFileReader(filename, 'SamplesPerFrame', frameLength);
+            i = info(fileReader);
+            if (i.NumChannels ~= 1)
+                error('To many channels. Cannot auralize a stereo sound. First convert to mono.');
+            end
+            
+            %TO DO: Check how to choose a device? Speakers/file. It is
+            %necessary to choose if the sound should be played or just
+            %saved to a new file.
+            deviceWriter = audioDeviceWriter('SampleRate', fileReader.SampleRate);
+            
+            %I assume that both ears' impulse responses are of equal
+            %length.
+            impulseResponseLength = length(leftEarFilter.getCoeffsB());
+            
+            if (impulseResponseLength ~= 1)
+                overlapLength = impulseResponseLength - 1;
+                leftEarOverlap  = zeros(overlapLength, 1);
+                rightEarOverlap = zeros(overlapLength, 1);
+                
+                while ~isDone(fileReader)
+                    rightEarOverlap = [rightEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    leftEarOverlap = [leftEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    chunk = step(fileReader);
+                    processedLeftEarChunk = Dsp.filter(chunk, leftEarFilter);
+                    processedRightEarChunk = Dsp.filter(chunk, rightEarFilter);
+                    chunkToPlay(:,1) = leftEarOverlap(1:frameLength) + processedLeftEarChunk(1:frameLength);
+                    chunkToPlay(:,2) = rightEarOverlap(1:frameLength) + processedRightEarChunk(1:frameLength);
+                    leftEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
+                    rightEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
+                    leftEarOverlap = processedLeftEarChunk(frameLength+1:end) + leftEarOverlap(frameLength+1:end);
+                    rightEarOverlap = processedRightEarChunk(frameLength+1:end) + rightEarOverlap(frameLength+1:end);
+                    play(deviceWriter, chunkToPlay);
+                end
+            else
+                while ~isDone(fileReader)
+                    chunk = step(fileReader);
+                    chunkToPlay(:,1) = Dsp.filter(chunk, leftEarFilter);
+                    chunkToPlay(:,2) = Dsp.filter(chunk, rightEarFilter);
+                    play(deviceWriter, chunkToPlay);
+                end
+            end
+            
         end
     end
 end

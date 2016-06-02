@@ -6,6 +6,12 @@ classdef ImageSource3d < handle
     end
     methods (Access = 'public')
         function this = ImageSource3d(soundParticle, receptionNo)
+            if soundParticle == 0
+                this.positionVector = Vec3d(500, 200, 300);
+                this.walls = [];
+                this.calcFilter();
+                return;
+            end
             reception = soundParticle.getReception(receptionNo);
             lastRay = reception.getLastRay();
             backtraceImageSourceRay = Ray3d(lastRay.getEndVector(), lastRay.getDirectionVector()*(-1));

@@ -1,0 +1,12 @@
+classdef Buffer < handle
+    
+    properties (GetAccess = 'private', SetAccess = 'private')
+        buffer;
+    end
+    
+    methods (Access = 'public')
+        function this = Buffer
+    end
+    
+end
+

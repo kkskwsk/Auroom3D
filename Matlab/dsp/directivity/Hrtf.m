@@ -1,17 +1,45 @@
 classdef Hrtf < handle
     properties (GetAccess = 'private', SetAccess = 'private')
+        anglesMap;
+        leftBuffers;
+        rightBuffers;
+        
         nodes;
         triangles;
         faces;
         %leftEarDirectivity;
         leftEarFiltersMap;
         rightEarFiltersMap;
-        DT;
         receiverModel;
     end
     
     methods (Access = 'private')
-        function initFilters(this, anglesMap, leftFilenamePattern, rightFilenamePattern)
+        function loadFilters(this, anglesMap, leftFilenamePattern, rightFilenamePattern)
+            this.leftBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            this.rightBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            %nodeCounter = int32(0);
+            %this.nodes = Vec3d.empty(0);
+            
+            %radius = this.receiverModel.getShape().getRadius();
+            %translationVec = this.receiverModel.getPositionVector();
+            
+            elevationAngles = keys(anglesMap);
+            for i = elevationAngles
+                i = cell2mat(i);
+                azimuthAngles = anglesMap(i);
+                leftTempMap = containers.Map('KeyType', 'int32', 'ValueType', 'any');
+                rightTempMap = containers.Map('KeyType', 'int32', 'ValueType', 'any');
+                for j = azimuthAngles
+                    filenameLeft = sprintf(leftFilenamePattern, i, j);
+                    filenameRight = sprintf(rightFilenamePattern, i, j);
+                    leftTempMap(j) = Handler(audioread(filenameLeft));
+                    rightTempMap(j) = Handler(audioread(filenameRight));
+                end
+                this.leftBuffers(i) = leftTempMap;
+                this.rightBuffers(i) = rightTempMap;
+            end
+        end 
+        function initFilters(this, anglesMap)
             this.leftEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
             this.rightEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
             nodeCounter = int32(0);
@@ -23,16 +51,16 @@ classdef Hrtf < handle
             elevationAngles = keys(anglesMap);
             for i = elevationAngles
                 i = cell2mat(i);
+                leftAzimuth2BufferMap = this.leftBuffers(i);
+                rightAzimuth2BufferMap = this.rightBuffers(i);
                 azimuthAngles = anglesMap(i);
                 for j = azimuthAngles
                     nodeCounter = nodeCounter + int32(1);
-                    convPhi = Hrtf.convertPhiToHR(j);
-                    convTheta = Hrtf.convertThetaToHR(i);
-                    filenameLeft = sprintf(leftFilenamePattern, convTheta, convPhi);
-                    filenameRight = sprintf(rightFilenamePattern, convTheta, convPhi);
-                    this.nodes(nodeCounter) = translationVec + Vec3d.createWithSpherical(radius, i, j);
-                    this.leftEarFiltersMap(nodeCounter) = audioread(filenameLeft);
-                    this.rightEarFiltersMap(nodeCounter) = audioread(filenameRight);
+                    convPhi = Hrtf.convertHRPhiToGeneral(j);
+                    convTheta = Hrtf.convertHRThetaToGeneral(i);
+                    this.nodes(nodeCounter) = translationVec + Vec3d.createWithSpherical(radius, convTheta, convPhi);
+                    this.leftEarFiltersMap(nodeCounter) = leftAzimuth2BufferMap(j);%audioread(filenameLeft);
+                    this.rightEarFiltersMap(nodeCounter) = rightAzimuth2BufferMap(j);
                 end
             end
         end 
@@ -53,17 +81,26 @@ classdef Hrtf < handle
             end
             faceColor  = [0.6875 0.8750 0.8984];
             tetramesh(DT,'FaceColor', faceColor,'FaceAlpha',1);
-            this.DT = DT;
         end
     end
     
     methods (Access = 'public')
-        function this = Hrtf(receiverModel)
-            this.receiverModel = receiverModel;
-            anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
-            Hrtf.fillAnglesMap(anglesMap);
+        function this = Hrtf()
+            this.anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+            Hrtf.fillAnglesMap(this.anglesMap);
             [leftEarFilenamePattern, rightEarFilenamePattern] = Hrtf.createFilenamePatterns();
-            this.initFilters(anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
+            this.loadFilters(this.anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
+%             this.receiverModel = receiverModel;
+%             anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+%             Hrtf.fillAnglesMap(anglesMap);
+%             [leftEarFilenamePattern, rightEarFilenamePattern] = Hrtf.createFilenamePatterns();
+%             this.initFilters(anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
+%             this.triangulate();
+        end
+        
+        function init(this, receiverModel)
+            this.receiverModel = receiverModel;
+            this.initFilters(this.anglesMap);
             this.triangulate();
         end
         
@@ -99,13 +136,12 @@ classdef Hrtf < handle
              
             g = H\S;%inv(H)*S;
             
-            resultLeftHRIR = g(1)*this.leftEarFiltersMap(triangle(1))...
-                           + g(2)*this.leftEarFiltersMap(triangle(2))...
-                           + g(3)*this.leftEarFiltersMap(triangle(3));
-            
-            resultRightHRIR = g(1)*this.rightEarFiltersMap(triangle(1))...
-                           + g(2)*this.rightEarFiltersMap(triangle(2))...
-                           + g(3)*this.rightEarFiltersMap(triangle(3));
+            resultLeftHRIR = g(1)*this.leftEarFiltersMap(triangle(1)).getProperty()...
+                           + g(2)*this.leftEarFiltersMap(triangle(2)).getProperty()...
+                           + g(3)*this.leftEarFiltersMap(triangle(3)).getProperty();
+            resultRightHRIR = g(1)*this.rightEarFiltersMap(triangle(1)).getProperty()...
+                           + g(2)*this.rightEarFiltersMap(triangle(2)).getProperty()...
+                           + g(3)*this.rightEarFiltersMap(triangle(3)).getProperty();
                        
             leftEarFilter  = Filter(1, resultLeftHRIR, 44100, 'LeftEar');
             rightEarFilter = Filter(1, resultRightHRIR, 44100, 'RightEar');
@@ -152,9 +188,10 @@ classdef Hrtf < handle
                     azimuthAngles = 0:quant:360-quant;
                 end
                 
-                phis = Hrtf.convertHRPhiToGeneral(azimuthAngles);
-                theta = Hrtf.convertHRThetaToGeneral(i);
-                anglesMap(theta) = phis;
+                %phis = Hrtf.convertHRPhiToGeneral(azimuthAngles);
+                %theta = Hrtf.convertHRThetaToGeneral(i);
+                %anglesMap(theta) = phis;
+                anglesMap(i) = azimuthAngles;
             end
         end
         

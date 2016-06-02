@@ -20,7 +20,7 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, elevationDirectionAngle, realSize)
+        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, elevationDirectionAngle, realSize, hrtf)
             this.positionVector = positionVector;
             this.azimuthDirectionAngle = azimuthDirectionAngle;
             this.elevationDirectionAngle = elevationDirectionAngle;
@@ -29,8 +29,9 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
             radius = size/2;
             this.shape = Sphere3d(positionVector, radius);
             tic
-            this.hrtf = Hrtf(this);
-            fprintf(1, 'Time of loading HRTF: %d [sec]', toc);
+            hrtf.init(this);
+            this.hrtf = hrtf;
+            fprintf(1, 'Time of initing HRTF: %d [sec]\n', toc);
         end
         
         function [isTrue, len] = intersect(this, ray)
