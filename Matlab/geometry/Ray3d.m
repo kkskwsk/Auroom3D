@@ -13,10 +13,10 @@ classdef Ray3d < handle
             this.length = 0;
         end
         
-        function dirVector = calcReflectionDirVector(this, line)
-            lineNormalVector = line.getNormalVector;
-            cos1 = -1 * Vec3d.dotProd(lineNormalVector, this.directionVector);
-            dirVector = this.directionVector + (line.getNormalVector() * 2 * cos1);
+        function dirVector = calcReflectionDirVector(this, face)
+            faceNormalVector = face.getNormalVector;
+            cos1 = -1 * Vec3d.dotProd(faceNormalVector, this.directionVector);
+            dirVector = this.directionVector + (face.getNormalVector() * 2 * cos1);
         end
         
         %TO DO: Dobrze to przetestowaæ!!!
@@ -33,7 +33,7 @@ classdef Ray3d < handle
             p = Vec3d.crossProd(this.directionVector, e2);
             tmp = Vec3d.dotProd(p, e1);
             
-            fprintf(1, 'Tmp is: %d. Epsilon is: %d\n', tmp, epsilon);
+            %fprintf(1, 'Tmp is: %d. Epsilon is: %d\n', tmp, epsilon);
             if (tmp > -epsilon && tmp < epsilon)
                 isTrue = false;
                 len = 0;
@@ -49,19 +49,20 @@ classdef Ray3d < handle
                 len = 0;
                 return;
             end
+            weights(1) = u;
             
-            q = Cross(s, e1);
-            v = tmp * Vec3d.dotProd(d, q);
+            q = Vec3d.crossProd(s, e1);
+            v = tmp * Vec3d.dotProd(this.directionVector, q);
             
-            if (v < 0 || v > 1)
+            if (v < 0 || u + v > 1)
                 isTrue = false;
                 len = 0;
                 return;
             end
             
-            t = tmp * Dot(e2, q);
+            t = tmp * Vec3d.dotProd(e2, q);
             
-            if (t < 0)
+            if (t <= epsilon)
                 isTrue = false;
                 len = 0;
                 return;
@@ -69,6 +70,9 @@ classdef Ray3d < handle
             
             isTrue = true;
             len = t;
+            
+            %intrscPoint = this.originVector + this.directionVector * t;
+            %printVec(intrscPoint);
         end
         
         function [isTrue, len, point] = intersectSphere(this, sphere)
@@ -122,7 +126,7 @@ classdef Ray3d < handle
             originVector = this.originVector;
         end
         function endVector = getEndVector(this)
-            endVector = Vec2d(this.originVector.getX() + this.length*this.directionVector.getX(), this.originVector.getY() + this.length*this.directionVector.getY(), this.originVector.getZ() + this.length*this.directionVector.getZ());
+            endVector = Vec3d(this.originVector.getX() + this.length*this.directionVector.getX(), this.originVector.getY() + this.length*this.directionVector.getY(), this.originVector.getZ() + this.length*this.directionVector.getZ());
         end
         function directionVector = getDirectionVector(this)
             directionVector = this.directionVector;

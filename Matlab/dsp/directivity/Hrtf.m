@@ -1,44 +1,194 @@
 classdef Hrtf < handle
     properties (GetAccess = 'private', SetAccess = 'private')
-        leftEarDirectivity;
-        rightEarDirectivity;
-        azimuthResolution;
+        nodes;
+        triangles;
+        faces;
+        %leftEarDirectivity;
+        leftEarFiltersMap;
+        rightEarFiltersMap;
+        DT;
+        receiverModel;
+    end
+    
+    methods (Access = 'private')
+        function initFilters(this, anglesMap, leftFilenamePattern, rightFilenamePattern)
+            this.leftEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            this.rightEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            nodeCounter = int32(0);
+            this.nodes = Vec3d.empty(0);
+            
+            radius = this.receiverModel.getShape().getRadius();
+            translationVec = this.receiverModel.getPositionVector();
+            
+            elevationAngles = keys(anglesMap);
+            for i = elevationAngles
+                i = cell2mat(i);
+                azimuthAngles = anglesMap(i);
+                for j = azimuthAngles
+                    nodeCounter = nodeCounter + int32(1);
+                    convPhi = Hrtf.convertPhiToHR(j);
+                    convTheta = Hrtf.convertThetaToHR(i);
+                    filenameLeft = sprintf(leftFilenamePattern, convTheta, convPhi);
+                    filenameRight = sprintf(rightFilenamePattern, convTheta, convPhi);
+                    this.nodes(nodeCounter) = translationVec + Vec3d.createWithSpherical(radius, i, j);
+                    this.leftEarFiltersMap(nodeCounter) = audioread(filenameLeft);
+                    this.rightEarFiltersMap(nodeCounter) = audioread(filenameRight);
+                end
+            end
+        end 
+        %Delaunay triangulation of measured HRTF points. To get surface triangles
+        %a convex hull is then created. This operation is necessary for
+        %HRTF interpolation.
+        function triangulate(this)
+            this.faces = Face3d.empty(0);
+            nodesNum = length(this.nodes);
+            coordsMatrix  = zeros(nodesNum, 3);
+            for i = 1:nodesNum
+                coordsMatrix(i, :) = this.nodes(i).getCoords();
+            end
+            DT = delaunayTriangulation(coordsMatrix);
+            this.triangles = DT.convexHull();
+            for i = 1:size(this.triangles, 1)
+                this.faces(i) = Face3d(this.nodes(this.triangles(i,1)), this.nodes(this.triangles(i,2)), this.nodes(this.triangles(i,3)));
+            end
+            faceColor  = [0.6875 0.8750 0.8984];
+            tetramesh(DT,'FaceColor', faceColor,'FaceAlpha',1);
+            this.DT = DT;
+        end
     end
     
     methods (Access = 'public')
-        function this = Hrtf()
-            this.azimuthResolution = 5;
-            angles = 0:this.azimuthResolution:355;
-            [leftEarFilenames, rightEarFilenames] = Hrtf.createFilenames(angles);
-            this.leftEarDirectivity = Directivity2d(angles, leftEarFilenames, 'leftEar');
-            this.rightEarDirectivity = Directivity2d(angles, rightEarFilenames, 'rightEear'); 
+        function this = Hrtf(receiverModel)
+            this.receiverModel = receiverModel;
+            anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+            Hrtf.fillAnglesMap(anglesMap);
+            [leftEarFilenamePattern, rightEarFilenamePattern] = Hrtf.createFilenamePatterns();
+            this.initFilters(anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
+            this.triangulate();
         end
         
-        function [leftEarFilter, rightEarFilter] = getFilters(this, angle)
-            roundedAngle = roundToNearestMultiple(angle, this.azimuthResolution);
-            if (roundedAngle == 360)
-                roundedAngle = 0;
+        function [leftEarFilter, rightEarFilter] = interpolate(this, headPositionVector, imageSource)
+            minLen = [];
+            imageSourcePositionVector = imageSource.getPositionVector();
+            directionVector = headPositionVector - imageSourcePositionVector;
+            directionVector = directionVector.normalize();
+            ray = Ray3d(imageSourcePositionVector, directionVector);
+            
+            for i = 1:length(this.faces)
+                if i == 364
+                    1;
+                end
+                [isTrue, len] = ray.intersectFace(this.faces(i));
+                if isTrue && (isempty(minLen) || minLen > len)
+                    minLen = len;
+                    triangle = this.triangles(i, :);
+                end
             end
-            leftEarFilter = this.leftEarDirectivity.getFilter(roundedAngle);
-            rightEarFilter = this.rightEarDirectivity.getFilter(roundedAngle);
-            if leftEarFilter.getFs() ~= leftEarFilter.getFs()
-                error('Sampling rates don''t match');
-            end
+            
+            ray.setLength(minLen);
+            intersectionPoint = ray.getEndVector();
+            
+           % Interpolation itself
+            S = [intersectionPoint.getX();...
+                 intersectionPoint.getY();...
+                 intersectionPoint.getZ()];
+             
+            H = [this.nodes(triangle(1)).getCoords(),...
+                 this.nodes(triangle(2)).getCoords(),...
+                 this.nodes(triangle(3)).getCoords()];
+             
+            g = H\S;%inv(H)*S;
+            
+            resultLeftHRIR = g(1)*this.leftEarFiltersMap(triangle(1))...
+                           + g(2)*this.leftEarFiltersMap(triangle(2))...
+                           + g(3)*this.leftEarFiltersMap(triangle(3));
+            
+            resultRightHRIR = g(1)*this.rightEarFiltersMap(triangle(1))...
+                           + g(2)*this.rightEarFiltersMap(triangle(2))...
+                           + g(3)*this.rightEarFiltersMap(triangle(3));
+                       
+            leftEarFilter  = Filter(1, resultLeftHRIR, 44100, 'LeftEar');
+            rightEarFilter = Filter(1, resultRightHRIR, 44100, 'RightEar');
         end
+            
+            
+            %leftEarFilter = this.leftEarDirectivity.getFilter(roundedAngle);
+            %rightEarFilter = this.rightEarDirectivity.getFilter(roundedAngle);
+            %if leftEarFilter.getFs() ~= leftEarFilter.getFs()
+            %    error('Sampling rates don''t match');
+            %end
+        %end
     end
     
     methods (Access = 'private', Static = true)
-        function [leftEarFilenames, rightEarFilenames] = createFilenames(angles)
-            anglesLength = length(angles);
-            leftEarFilenames = zeros(anglesLength, length('X0e000a.wav'));
-            rightEarFilenames = zeros(anglesLength, length('X0e000a.wav'));
-            
-            for i = 1:length(angles)
-                leftEarFilenames(i,:) = sprintf('L0e%03da.wav', angles(i));
-                rightEarFilenames(i,:) = sprintf('R0e%03da.wav', angles(i));
+        function fillAnglesMap(anglesMap)
+            azimuthAngles = [];
+            elevationAngles = -40:10:90;
+            for i = elevationAngles
+                if i == -40 || i == 40
+                    azimuthAngles = [0 6 13 19 26 32 39 45 51 58 64 71 77 ...
+                                     84 90 96 103 109 116 122 129 135 141 ...
+                                     148 154 161 167 174 180 186 193 199  ...
+                                     206 212 219 225 231 238 244 251 257  ...
+                                     264 270 276 283 289 296 302 309 315  ...
+                                     321 328 334 341 347 354]; 
+                elseif i == 90
+                    azimuthAngles = 0;
+                else
+                    if i == 0 || i == -10 || i == 10 || i == -20 || i == 20
+                        quant = 5;
+                    elseif i == -30 || i == 30
+                        quant = 6;
+                    elseif i == 50
+                        quant = 8;
+                    elseif i == 60
+                        quant = 10;
+                    elseif i == 70
+                        quant = 15;
+                    elseif i == 80
+                        quant = 30;
+                    end
+                    
+                    azimuthAngles = 0:quant:360-quant;
+                end
+                
+                phis = Hrtf.convertHRPhiToGeneral(azimuthAngles);
+                theta = Hrtf.convertHRThetaToGeneral(i);
+                anglesMap(theta) = phis;
             end
+        end
+        
+        function [leftEarFilenamePattern, rightEarFilenamePattern] = createFilenamePatterns()
+            leftEarFilenamePattern = 'L%1de%1.03da.wav';
+            rightEarFilenamePattern = 'R%1de%1.03da.wav';
         end
     end
     
+    methods (Access = 'public', Static = true)
+        function [theta, phi] = convertAnglesToGeneralCoords(thetaHR, phiHR)
+            theta = 90 - thetaHR;
+            phi = -phiHR;
+        end
+        
+        function [thetaHR, phiHR] = convertAnglesToHRCoords(theta, phi)
+            thetaHR = 90 - theta;
+            phiHR = -phi;
+        end
+        
+        function theta = convertHRThetaToGeneral(thetaHR)
+            theta = 90 - thetaHR;
+        end
+        function theta = convertHRPhiToGeneral(phiHR)
+            theta = -phiHR;
+        end
+        
+        function thetaHR = convertThetaToHR(theta)
+            thetaHR = 90 - theta;
+        end
+        
+        function phiHR = convertPhiToHR(phi)
+            phiHR = -phi;
+        end
+    end
 end
 

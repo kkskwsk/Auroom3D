@@ -16,10 +16,11 @@ classdef Face3d < handle
     methods (Access = 'public')
         %Constructor
         function this = Face3d(vecA, vecB, vecC)
+            this.vertices = Vec3d.empty(0);
             this.vertices(1) = vecA;
             this.vertices(2) = vecB;
             this.vertices(3) = vecC;
-            calcNormal();
+            this.calcNormal();
             
         end
         
@@ -27,7 +28,7 @@ classdef Face3d < handle
             v12 = this.vertices(2) - this.vertices(1); 
             v13 = this.vertices(3) - this.vertices(1);
             
-            normal = cross([v12.getX(), v12.getY(), v12.getZ()], [v13.getX(), v13.getY(), v13.getZ()]);
+            normal = Vec3d.crossProd(v12, v13);
             tempNormalVector = Vec3d(normal.getX(), normal.getY(), normal.getZ());
             this.normalVector = tempNormalVector.normalize();
         end

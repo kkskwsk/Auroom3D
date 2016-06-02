@@ -5,7 +5,7 @@ close all;
 addpath ../config;
 configInitPath;
 
-simulationContext = Simulation2dContext();
+simulationContext = Simulation3dContext();
 
 simulationContext.start();
 %simulationContext.drawScene();

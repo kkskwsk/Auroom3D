@@ -17,9 +17,11 @@ classdef Vec3d < handle
     methods (Access = 'public')
         %Constructor
         function this = Vec3d(x, y, z)
-            this.x = x;
-            this.y = y;
-            this.z = z;
+                this.x = x;
+                this.y = y;
+                this.z = z;
+            
+                %this.calcSphericalCoords();
         end
         
         function length = getLength(this)
@@ -45,12 +47,24 @@ classdef Vec3d < handle
             r = Vec3d(vec1.x * scalar, vec1.y * scalar, vec1.z * scalar);
         end
         
+        function print(this)
+            fprintf(1, 'Vec3d object:\nx = %d,\ny = %d,\nz = %d\n', this.x, this.y, this.z);
+        end
+        
         function normalizedVector = normalize(this)
             length = this.getLength();
             normalizedVector = Vec3d(this.x/length, this.y/length, this.z/length);
         end
         
         %Getters
+        %%Cartesian
+        function coords = getCoords(this)
+            coords = [this.x; this.y; this.z];
+%             coords(1) = this.x;
+%             coords(2) = this.y;
+%             coords(3) = this.z;
+        end
+        
         function x = getX(this)
             x = this.x;
         end
@@ -62,6 +76,7 @@ classdef Vec3d < handle
             z = this.z;
         end
         %Setters
+        %%Cartesian
         function x = setX(this, x)
             this.x = x;
         end
@@ -80,14 +95,32 @@ classdef Vec3d < handle
         %    angleRad = acos(dot([vec1.x, vec1.y], [vec2.x, vec2.y])/(vec1.getLength() * vec2.getLength()));
         %    angle = angleRad * (180/pi);
         %end
+        function [x, y, z] = calcCartesianCoords(radius, theta, phi)
+            x = radius*sind(theta)*cosd(phi);
+            y = radius*sind(theta)*sind(phi);
+            z = radius*cosd(theta);
+        end
+        
+        function [radius, theta, phi] = calcSphericalCoords(this)
+            radius = sqrt(this.x^2 + this.y^2 + this.z^2);
+            theta = acos(this.z/radius);
+            phi = acos(this.y/this.x);
+        end
+        
+        function vec3d = createWithSpherical(radius, theta, phi)
+            [x, y, z] = Vec3d.calcCartesianCoords(radius, theta, phi);
+            vec3d = Vec3d(x, y, z);
+        end
+        
         function r = dotProd(vec1, vec2)
             r = dot([vec1.x vec1.y vec1.z], [vec2.x vec2.y vec2.z]);
         end
         
         function r = crossProd(vec1, vec2)
             matrixResult = cross([vec1.getX(), vec1.getY(), vec1.getZ()], [vec2.getX(), vec2.getY(), vec2.getZ()]);
-            r = Vec3d(matrixResult(1), matrixResult(2), matrixResult(1));
+            r = Vec3d(matrixResult(1), matrixResult(2), matrixResult(3));
         end
+        
         
     end
 end

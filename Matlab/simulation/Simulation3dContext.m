@@ -31,34 +31,33 @@ classdef Simulation3dContext < handle
                                          this.settings.roomModel.materials, ...
                                          this.settings.roomModel.medium);
                                      
-            this.sourceModel = Source2dModel(this.settings.sourceModel.positionVector, ...
-                                             this.settings.sourceModel.directionAngle, ...
-                                             this.settings.sourceModel.realSize, ...
-                                             this.settings.sourceModel.soundPowerLevel, ...
-                                             this.settings.sourceModel.directivityFactor);
-            this.sourceModel.setNumberOfParticles(2000);
+            this.sourceModel = Source3dModel(this.settings.sourceModel.positionVector, ...
+                                             this.settings.sourceModel.directionAngle.azimuth, ...
+                                             this.settings.sourceModel.directionAngle.elevation);
+            this.sourceModel.setNumberOfParticles(100);
             
-            this.receiverModel = Receiver2dModel(this.settings.receiverModel.positionVector, ...
-                                                 this.settings.receiverModel.directionAngle, ...
+            this.receiverModel = Receiver3dModel(this.settings.receiverModel.positionVector, ...
+                                                 this.settings.receiverModel.directionAngle.azimuth, ...
+                                                 this.settings.receiverModel.directionAngle.elevation, ...
                                                  this.settings.receiverModel.realSize);
-            this.drawingContext = Drawing2dContext(this.settings.drawing.canvasSizeX, ... 
-                                                   this.settings.drawing.canvasSizeY, ...
-                                                   this.settings.drawing.lineWidth);
+%             this.drawingContext = Drawing2dContext(this.settings.drawing.canvasSizeX, ... 
+%                                                    this.settings.drawing.canvasSizeY, ...
+%                                                    this.settings.drawing.lineWidth);
             this.distanceThreshold = this.settings.simulation.distanceThreshold;
             this.speedOfSound = this.settings.simulation.speedOfSound;
         end
         
-        function drawScene(this)
-            this.roomModel.draw(this.drawingContext); % funkcje powinny sie nazywac po prostu "draw"
-            this.sourceModel.draw(this.drawingContext);
-            this.receiverModel.draw(this.drawingContext);
-            this.sourceModel.drawRays(this.drawingContext);
-        end
+%         function drawScene(this)
+%             this.roomModel.draw(this.drawingContext); % funkcje powinny sie nazywac po prostu "draw"
+%             this.sourceModel.draw(this.drawingContext);
+%             this.receiverModel.draw(this.drawingContext);
+%             this.sourceModel.drawRays(this.drawingContext);
+%         end
         
-        function showScene(this)
-            figure();
-            imshow(this.drawingContext.getCanvas());
-        end
+%         function showScene(this)
+%             figure();
+%             imshow(this.drawingContext.getCanvas());
+%         end
         
         function start(this)
             this.sourceModel.shootParticles(this);
@@ -83,7 +82,7 @@ classdef Simulation3dContext < handle
                             continue;
                         end
                         imageSourcesCounter = imageSourcesCounter + 1;
-                        imageSource = ImageSource2d(soundParticle, j);
+                        imageSource = ImageSource3d(soundParticle, j);
                         this.imageSources = [this.imageSources imageSource];
                         [leftEarImpulseResponse, rightEarImpulseResponse] = this.receiverModel.binauralize(imageSource, impulse, this);
                         leftChannel = Dsp.addBuffers(leftChannel, leftEarImpulseResponse);
@@ -108,6 +107,9 @@ classdef Simulation3dContext < handle
         function result = isImageSourceConsidered(this, particle, receptionNo)
             reception = particle.getReception(receptionNo);
             receptionWalls = reception.getWalls();
+            if isempty(receptionWalls)
+                1;
+            end
             for i=1:length(this.imageSources)
                 if isequal(this.imageSources(i).getWalls(), receptionWalls)
                     result = true;
@@ -209,27 +211,27 @@ classdef Simulation3dContext < handle
             
             this.settings.sourceModel.positionX = 1000;
             this.settings.sourceModel.positionY = 1400;
-            this.settings.sourcemodel.positionZ = 300; %zmieniæ podawanie pozycji - w metrach
+            this.settings.sourceModel.positionZ = 300; %zmieniæ podawanie pozycji - w metrach
             this.settings.sourceModel.positionVector = Vec3d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY, this.settings.sourceModel.positionZ);
             this.settings.sourceModel.directionAngle.elevation = 0; %in degrees
             this.settings.sourceModel.directionAngle.azimuth = 0; 
-            this.settings.sourceModel.realSize = 0.5; %in meters
+            %this.settings.sourceModel.realSize = 0.5; %in meters
             
-            this.settings.receiverModel.positionX = 200;
-            this.settings.receiverModel.positionY = 250;
+            this.settings.receiverModel.positionX = 500;
+            this.settings.receiverModel.positionY = 500;
             this.settings.receiverModel.positionZ = 300;
             this.settings.receiverModel.positionVector = Vec3d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY, this.settings.receiverModel.positionZ);
             this.settings.receiverModel.directionAngle.elevation = 0;
             this.settings.receiverModel.directionAngle.azimuth = 40; %in degrees
-            this.settings.receiverModel.realSize = 0.4; %in meters
+            this.settings.receiverModel.realSize = 0.5; %in meters
             
             this.settings.simulation.temperature = 21; %Celsius
             this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
-            this.settings.simulation.timeThreshold = 3; %seconds
+            this.settings.simulation.timeThreshold = 0.7; %seconds
             this.settings.simulation.distanceThreshold = this.settings.simulation.timeThreshold * this.settings.simulation.speedOfSound; 
             this.settings.simulation.sampleRate = 44100;
             
-            this.settings.dsp.frameLength = 4096;
+            this.settings.dsp.frameLength = 2*4096;
             this.checkSceneSanity();
         end
         

@@ -2,7 +2,6 @@ classdef SoundParticle < handle
     properties (GetAccess = 'private', SetAccess = 'private')
         initialSettings;
         rays; %container
-        startAngle;
         distance;
         walls; %container
         received;
@@ -17,24 +16,22 @@ classdef SoundParticle < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = SoundParticle(sourceModel, angle)
-            this.initialSettings.angle = sourceModel.getDirectionAngle() + angle;
+        function this = SoundParticle(sourceModel, directionVector)
             this.initialSettings.originVector = sourceModel.getPositionVector();
+            this.initialSettings.directionVector = directionVector;
             %this.rays(1) = Ray2d(originVector, angle);
             this.distance = 0;
-            this.startAngle = angle;
-            this.walls = Wall2d.empty(0);
+            this.walls = Wall3d.empty(0);
             this.received = false;
             this.receptions = Reception.empty(0);
         end
         
-        function shoot(this, simulation2dContext)
+        function shoot(this, simulation3dContext)
             %disp('============SHOOT================')
             %tic
-            distanceThreshold = simulation2dContext.getDistanceThreshold();
+            distanceThreshold = simulation3dContext.getDistanceThreshold();
             originVector = this.initialSettings.originVector;
-            angle = this.initialSettings.angle;
-            directionVector = Vec2d(cosd(angle), sind(angle));
+            directionVector = this.initialSettings.directionVector;
             checkReceiver = true;
             %fprintf(1, 'Beginning step of shoot: %d sec', toc);
             %receiverCheckTimes = 0;
@@ -42,20 +39,23 @@ classdef SoundParticle < handle
             %tic
             while (this.distance <= distanceThreshold)
                 %tic
-                this.rays = [this.rays Ray2d(originVector, directionVector)];
+                if (length(this.rays) == 24)
+                    1;
+                end
+                this.rays = [this.rays Ray3d(originVector, directionVector)];
                 ray = this.rays(end);
                 %fprintf(1, 'Ray creation: %d sec\n', toc);
                 
                 %tic
                 if checkReceiver
-                    [intersectsReceiver, distRec, angle] = simulation2dContext.getReceiverModel().intersect(ray);
+                    [intersectsReceiver, distRec] = simulation3dContext.getReceiverModel().intersect(ray);
                 end
                 %temp = toc;
                 %receiverCheckTimes = [receiverCheckTimes temp];
                 %fprintf(1, 'Receiver check: %d sec\n', temp);
                 
                 %tic
-                [distWall, wall, directionVector] = simulation2dContext.getRoomModel().reflect(ray);
+                [distWall, wall, directionVector] = simulation3dContext.getRoomModel().reflect(ray);
                 %temp = toc;
                 %wallCheckTimes = [wallCheckTimes temp];
                 %fprintf(1, 'Wall check: %d sec\n', toc);
@@ -115,9 +115,10 @@ classdef SoundParticle < handle
         end
         
         function draw(this, drawing2dContext)
-            for i = 1:length(this.rays)
-                this.rays(i).draw(drawing2dContext);
-            end
+%             for i = 1:length(this.rays)
+%                 this.rays(i).draw(drawing2dContext);
+%             end
+            error('Drawing is not supported in 3d yet');
         end 
         
         function rays = getRays(this)
@@ -125,9 +126,6 @@ classdef SoundParticle < handle
         end
         function distance = getDistance(this)
             distance = this.distance;
-        end
-        function startAngle = getStartAngle(this)
-            startAngle = this.startAngle;
         end
         function received = isReceived(this)
             received = this.received;

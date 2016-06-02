@@ -31,17 +31,27 @@ classdef Room3dModel < handle
         
         %TO DO; na pocz¹tku poprawiæ ray
         function [minLen, wall, reflectionDirVector] = reflect(this, ray)
-            error('THIS FUNCTION IS NOT READY YET');
             minLen = [];
+            eps = 10e-12;
+            if ray.getOriginVector().getZ() == 0
+                1;
+            end
             for i = 1:length(this.walls)
-                [isTrue, len] = ray.intersectLineSegment(this.walls(i).getLine());
-                if isTrue && (isempty(minLen) || (minLen > len))
+                [isTrue, len] = ray.intersectFace(this.walls(i).getFace());
+                if isTrue && (len > eps) && (isempty(minLen) || (minLen > len))
                     wall = this.walls(i);
                     minLen = len;
                 end
             end
             
-            reflectionDirVector = ray.calcReflectionDirVector(wall.getLine()); 
+            rayCopy = Ray3d(ray.getOriginVector(), ray.getDirectionVector());
+            rayCopy.setLength(minLen);
+            endVec = rayCopy.getEndVector();
+            
+            reflectionDirVector = ray.calcReflectionDirVector(wall.getFace()); 
+            if (endVec.getZ == 0) && (reflectionDirVector.getZ < 0)
+                1;
+            end
         end
         
         function draw(this, drawing2dContext)
@@ -49,7 +59,7 @@ classdef Room3dModel < handle
             %for i = 1:length(this.walls)
             %    this.walls(i).draw(drawing2dContext);
             %end
-            error('Drawing is not supported in 3D');
+            error('Drawing is not supported in 3D'); 
         end
         %Getters
         function walls = getWalls(this)
