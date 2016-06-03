@@ -12,6 +12,10 @@ classdef Handler < handle
         function prop = getProperty(this)
             prop = this.property;
         end
+        
+        function setProperty(this, property)
+            this.property = property;
+        end
     end
 end
 

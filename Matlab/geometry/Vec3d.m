@@ -29,10 +29,20 @@ classdef Vec3d < handle
         end
         
         function r = eq(vec1, vec2)
-            if (vec1.x == vec2.x && vec1.y == vec2.y && vec1.z == vec2.z)
-                r = true;
+            if (length(vec1) == 1)
+                if (vec1.x == vec2.x && vec1.y == vec2.y && vec1.z == vec2.z)
+                    r = true;
+                else
+                    r = false;
+                end
+            elseif length(vec1 > 1)
+                r = zeros(size(vec1));
+                for i = 1:length(vec1)
+                    temp = vec1(i) == vec2(i);
+                    r(i) = temp;
+                end
             else
-                r = false;
+                error('empty input');
             end
         end
         
@@ -45,6 +55,23 @@ classdef Vec3d < handle
         end
         function r = mtimes(vec1, scalar)
             r = Vec3d(vec1.x * scalar, vec1.y * scalar, vec1.z * scalar);
+        end
+        
+        function rotate(this, axis, angle)
+            if strcmp('z', axis)
+                rotMatrix = [ cosd(angle), sind(angle), 0, 0;...
+                             -sind(angle), cosd(angle), 0, 0;...
+                              0          , 0          , 1, 0;...
+                              0          , 0          , 0, 1];
+                pointMatrix = [this.getCoords()' 0];
+                
+                rotatedPoint = pointMatrix * rotMatrix;
+                this.setX(rotatedPoint(1));
+                this.setY(rotatedPoint(2));
+                this.setZ(rotatedPoint(3));
+            else
+                error('Not supported');
+            end
         end
         
         function print(this)

@@ -44,17 +44,14 @@ classdef Source3dModel < handle
             
             directionVectors = Source3dModel.calcParticlesDirections(this.numberOfParticles, false);
             %directionVectors = Vec3d(0, -1, 0);
+            %directionVectors(2) = Vec3d(0, -0.9999, -0.01);
             for i = 1:length(directionVectors)
                 particle = SoundParticle(this, directionVectors(i));
                 this.particles(i) = particle;
             end
             tic
+            
             particlesLocal = this.particles;
-%             parfor j = 1:length(particlesLocal)
-%                 particle = particlesLocal(j);
-%                 particle.shoot(simulationContext);
-%                 particlesLocal(j) = particle;
-%             end
             parfor j = 1:length(particlesLocal)
                 particle = particlesLocal(j);
                 particle.shoot(simulationContext);

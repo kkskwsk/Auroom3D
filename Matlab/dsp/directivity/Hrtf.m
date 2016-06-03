@@ -47,6 +47,7 @@ classdef Hrtf < handle
             
             radius = this.receiverModel.getShape().getRadius();
             translationVec = this.receiverModel.getPositionVector();
+            rotationAngle = this.receiverModel.getAzimuthDirectionAngle();
             
             elevationAngles = keys(anglesMap);
             for i = elevationAngles
@@ -58,7 +59,9 @@ classdef Hrtf < handle
                     nodeCounter = nodeCounter + int32(1);
                     convPhi = Hrtf.convertHRPhiToGeneral(j);
                     convTheta = Hrtf.convertHRThetaToGeneral(i);
-                    this.nodes(nodeCounter) = translationVec + Vec3d.createWithSpherical(radius, convTheta, convPhi);
+                    node = Vec3d.createWithSpherical(radius, convTheta, convPhi);
+                    node.rotate('z', rotationAngle);
+                    this.nodes(nodeCounter) = translationVec + node;
                     this.leftEarFiltersMap(nodeCounter) = leftAzimuth2BufferMap(j);%audioread(filenameLeft);
                     this.rightEarFiltersMap(nodeCounter) = rightAzimuth2BufferMap(j);
                 end
@@ -111,17 +114,26 @@ classdef Hrtf < handle
             directionVector = directionVector.normalize();
             ray = Ray3d(imageSourcePositionVector, directionVector);
             
-            for i = 1:length(this.faces)
-                if i == 364
-                    1;
-                end
-                [isTrue, len] = ray.intersectFace(this.faces(i));
-                if isTrue && (isempty(minLen) || minLen > len)
-                    minLen = len;
+%             parfor i = 1:length(this.faces)
+%                 [isTrue, len] = ray.intersectFace(this.faces(i));
+%                 if isTrue && (isempty(minLen) || minLen > len)
+%                     minLen = len;
+%                     triangle = this.triangles(i, :);
+%                 end
+%             end
+            localFaces = this.faces;
+            %parfor!!!!!!!!!!
+            parfor i = 1:length(this.faces)
+                [isTrue(i), len(i)] = ray.intersectFace(localFaces(i));
+            end
+            
+            for i = find(isTrue)
+                if (isempty(minLen) || minLen > len(i))
+                    minLen = len(i);
                     triangle = this.triangles(i, :);
                 end
             end
-            
+
             ray.setLength(minLen);
             intersectionPoint = ray.getEndVector();
             

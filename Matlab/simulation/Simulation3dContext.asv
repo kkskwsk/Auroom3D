@@ -138,12 +138,10 @@ classdef Simulation3dContext < handle
             
             for i = 1:length(leftContainer);
                 leftProp = leftContainer(i).getProperty();
-                rightProp = rightContainer(i).getProperty();
                 if isempty(leftProp) || isempty(rightProp)
-                    continue;
                 end
-                leftChannel = Dsp.addBuffers(leftChannel, leftProp);
-                rightChannel = Dsp.addBuffers(rightChannel, rightProp);
+                leftChannel = Dsp.addBuffers(leftChannel, leftContainer(i).getProperty());
+                rightChannel = Dsp.addBuffers(rightChannel, rightContainer(i).getProperty());
             end
 %             
 %             parfor i = 1:length(particles)

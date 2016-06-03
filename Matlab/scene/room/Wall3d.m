@@ -3,7 +3,7 @@ classdef Wall3d < handle
     % Short description
     %--------------
     properties (GetAccess = 'private', SetAccess = 'private')
-        face;
+        faces;
         material;
         id;
     end
@@ -16,9 +16,9 @@ classdef Wall3d < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Wall3d(face, material, id)
+        function this = Wall3d(faces, material, id)
             if (nargin > 0)
-                this.face = face;
+                this.faces = faces;
                 this.material = material;
                 this.id = id;
             end
@@ -31,11 +31,15 @@ classdef Wall3d < handle
         end
         
         %Getters
-        function line = getFace(this)
-            line = this.face;
+        function faces = getFaces(this)
+            faces = this.faces;
         end
         function material = getMaterial(this)
             material = this.material;
+        end
+        
+        function appendFace (this, face)
+            this.faces(end + 1) = face;
         end
     end
 end
