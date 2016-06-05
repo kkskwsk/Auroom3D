@@ -6,7 +6,6 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
         positionVector;
         shape;
         azimuthDirectionAngle; %in degrees
-        elevationDirectionAngle;
         realSize;
         hrtf;
         %freqResponse;
@@ -20,13 +19,11 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, elevationDirectionAngle, realSize, hrtf)
+        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, realSize, hrtf)
             this.positionVector = positionVector;
             this.azimuthDirectionAngle = azimuthDirectionAngle;
-            this.elevationDirectionAngle = elevationDirectionAngle;
             this.realSize = realSize;
-            size = calcSizeInPixels(this.realSize);
-            radius = size/2;
+            radius = calcSizeInPixels(this.realSize);
             this.shape = Sphere3d(positionVector, radius);
             tic
             hrtf.init(this);
@@ -60,33 +57,24 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
         
         function [leftEarImpulseResponse, rightEarImpulseResponse] = binauralize(this, imageSource, impulse, simulationContext)
             %filtracja zwi¹zana z odbiciami od œcian
-            %tic
-            filteredBuffer = impulse * imageSource.getWallFilter().getCoeffsB();
-            %filteredBuffer = Dsp.filter(impulse, imageSource.getWallFilter());
-            %fprintf(1, 'Przetwarzanie odbicia od œcian: %d [sec]\n', toc);
+            %filteredBuffer = impulse * imageSource.getWallFilter().getCoeffsB();
+            filteredBuffer = Dsp.filter(impulse, imageSource.getWallFilter());
             
             %dodane opóŸnienie
-            %tic
             distance = this.calcDistanceFromImageSource(imageSource);
             delayTime = distance / simulationContext.getSpeedOfSound();
-            delaySamples = round(delayTime * simulationContext.getSettings().simulation.sampleRate);
+            delaySamples = round(delayTime * 44100);
             filteredBuffer = delay(filteredBuffer, delaySamples);
-            %fprintf(1, 'Przetwarzanie opóŸnienia: %d [sec]\n', toc);
             
             %filtracja zwi¹zana z przebyt¹ odleg³oœci¹ oraz transmitancj¹
             %oœrodka
-            %tic
             attFactor = 1/(distance);
-            %filteredBuffer = Dsp.filter(filteredBuffer, getAirFilter(distance));
             filteredBuffer = filteredBuffer.*attFactor;
-            %fprintf(1, 'Przetwarzanie propagacji przez medium: %d [sec]\n', toc);
             %filtracja binauralna (HRTF)
-            %tic
             [leftEarFilter, rightEarFilter] = this.interpolateHrtf(imageSource);
             
             leftEarImpulseResponse = Dsp.filter(filteredBuffer, leftEarFilter);
             rightEarImpulseResponse = Dsp.filter(filteredBuffer, rightEarFilter);
-            %fprintf(1, 'Przetwarzanie binauralne: %d [sec]\n', toc);
         end
         
         function draw(this, drawing2dContext)
@@ -118,9 +106,6 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
         end
         function directionAngle = getAzimuthDirectionAngle(this)
             directionAngle = this.azimuthDirectionAngle;
-        end
-        function directionAngle = getElevationDirectionAngle(this)
-            directionAngle = this.elevationDirectionAngle;
         end
         function realSize = getRealSize(this)
             realSize = this.realSize;

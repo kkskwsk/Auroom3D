@@ -1,3 +1,3 @@
 function hrtf = loadHrtf()
-hrtf = Simulation3dContext.loadHrtf();
+hrtf = Hrtf.loadHrtf();
 end

@@ -27,42 +27,28 @@ classdef SoundParticle < handle
         end
         
         function shoot(this, simulation3dContext)
-            %disp('============SHOOT================')
-            %tic
             distanceThreshold = simulation3dContext.getDistanceThreshold();
             originVector = this.initialSettings.originVector;
             directionVector = this.initialSettings.directionVector;
             checkReceiver = true;
-            %fprintf(1, 'Beginning step of shoot: %d sec', toc);
-            %receiverCheckTimes = 0;
-            %wallCheckTimes = 0;
-            %tic
+            
             while (this.distance <= distanceThreshold)
-                %tic
-                if (length(this.rays) == 24)
-                    1;
-                end
                 this.rays = [this.rays Ray3d(originVector, directionVector)];
                 ray = this.rays(end);
-                %fprintf(1, 'Ray creation: %d sec\n', toc);
                 
-                %tic
                 if checkReceiver
                     [intersectsReceiver, distRec] = simulation3dContext.getReceiverModel().intersect(ray);
                 end
-                %temp = toc;
-                %receiverCheckTimes = [receiverCheckTimes temp];
-                %fprintf(1, 'Receiver check: %d sec\n', temp);
-                
-                %tic
                 [distWall, wall, directionVector] = simulation3dContext.getRoomModel().reflect(ray);
-                %temp = toc;
-                %wallCheckTimes = [wallCheckTimes temp];
-                %fprintf(1, 'Wall check: %d sec\n', toc);
                 
+                if isempty(wall)
+                    msgID = 'PARTICLESHOOT:NoWallIntersected';
+                    msg = 'Unable to intersect room boundary.';
+                    exception = MException(msgID,msg);
+                    throw(exception);
+                end
                 
                 if intersectsReceiver && (distRec < distWall)
-                    %tic
                     ray.setLength(distRec);
                     this.distance = this.distance + calcSizeInMeters(abs(distRec));
                     this.received = true;
@@ -71,22 +57,16 @@ classdef SoundParticle < handle
                     directionVector = ray.getDirectionVector();
                     checkReceiver = false;
                     intersectsReceiver = false;
-                    %fprintf(1, 'Handling Receiver incidence of tracing loop: %d sec\n', toc);
                     continue; 
                 end
                 
-                
-                %tic
                 this.walls(end + 1) = wall;
                 ray.setLength(distWall);
                 this.distance = this.distance + calcSizeInMeters(abs(distWall));
                 originVector = ray.getEndVector();
                 checkReceiver = true;
-                %fprintf(1, 'Handling wall incidence of tracing loop: %d sec\n', toc);
             end
-            %fprintf(1, 'Time of processing particle: %d\n', toc);
             
-            %tic
             if (this.distance > distanceThreshold)
                 excess = this.distance - distanceThreshold;
                 ray.setLength(ray.getLength() - calcSizeInPixels(excess));
@@ -99,19 +79,6 @@ classdef SoundParticle < handle
                     this.walls(end) = [];
                 end
             end
-            %fprintf(1, 'Last step of tracing loop: %d sec\n', toc);
-            %disp('============STOP================')
-            %figure()
-            %plot(receiverCheckTimes);
-            %title('Receiver check Times');
-            %xlabel('Check index');
-            %ylabel('Time [s]');
-            %figure()
-            %plot(wallCheckTimes);
-            %title('Wall check Times');
-            %xlabel('Check index');
-            %ylabel('Time [s]');
-            
         end
         
         function draw(this, drawing2dContext)

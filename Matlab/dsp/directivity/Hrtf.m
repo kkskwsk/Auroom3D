@@ -17,13 +17,19 @@ classdef Hrtf < handle
         function loadFilters(this, anglesMap, leftFilenamePattern, rightFilenamePattern)
             this.leftBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
             this.rightBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
-            %nodeCounter = int32(0);
-            %this.nodes = Vec3d.empty(0);
             
-            %radius = this.receiverModel.getShape().getRadius();
-            %translationVec = this.receiverModel.getPositionVector();
-            
+%             wb = waitbar(0, 'Loading HRTF files. Please wait.');
+%             step = 0;
             elevationAngles = keys(anglesMap);
+%             filesNumber = 0;
+%             for i = elevationAngles
+%                 i = cell2mat(i);
+%                 azimuthAngles = anglesMap(i);
+%                 for j = azimuthAngles
+%                     filesNumber = filesNumber + 1;
+%                 end
+%             end
+            
             for i = elevationAngles
                 i = cell2mat(i);
                 azimuthAngles = anglesMap(i);
@@ -34,10 +40,13 @@ classdef Hrtf < handle
                     filenameRight = sprintf(rightFilenamePattern, i, j);
                     leftTempMap(j) = Handler(audioread(filenameLeft));
                     rightTempMap(j) = Handler(audioread(filenameRight));
+%                     step = step + 2;
+%                     waitbar(step/filesNumber);
                 end
                 this.leftBuffers(i) = leftTempMap;
                 this.rightBuffers(i) = rightTempMap;
             end
+%             close(wb);
         end 
         function initFilters(this, anglesMap)
             this.leftEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
@@ -155,8 +164,8 @@ classdef Hrtf < handle
                            + g(2)*this.rightEarFiltersMap(triangle(2)).getProperty()...
                            + g(3)*this.rightEarFiltersMap(triangle(3)).getProperty();
                        
-            leftEarFilter  = Filter(1, resultLeftHRIR, 44100, 'LeftEar');
-            rightEarFilter = Filter(1, resultRightHRIR, 44100, 'RightEar');
+            leftEarFilter  = Filter(1, resultLeftHRIR, 44100);
+            rightEarFilter = Filter(1, resultRightHRIR, 44100);
         end
             
             
@@ -237,6 +246,12 @@ classdef Hrtf < handle
         
         function phiHR = convertPhiToHR(phi)
             phiHR = -phi;
+        end
+    end
+    
+    methods (Access = 'public', Static = true)
+        function hrtf = loadHrtf()
+            hrtf = Hrtf();
         end
     end
 end

@@ -6,7 +6,7 @@ classdef Filter < handle
         aCoeffs;
         bCoeffs;
         fs;
-        type;
+%         type;
         
     end
     %--------------
@@ -18,16 +18,16 @@ classdef Filter < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Filter(aCoeffs, bCoeffs, fs, type)
+        function this = Filter(aCoeffs, bCoeffs, fs)%, type)
             this.aCoeffs = aCoeffs;
             this.bCoeffs = bCoeffs;
             this.fs = fs;
-            this.type = type;
+%             this.type = type;
         end
         %Getters
-        function type = getType(this)
-            type = this.type;
-        end
+%         function type = getType(this)
+%             type = this.type;
+%         end
         
         function aCoeffs = getCoeffsA(this)
             aCoeffs = this.aCoeffs;

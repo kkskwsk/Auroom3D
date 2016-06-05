@@ -5,14 +5,8 @@ classdef Source3dModel < handle
     properties (GetAccess = 'private', SetAccess = 'private')
         positionVector;
         shape;
-        azimuthDirectionAngle; %in degrees
-        elevationDirectionAngle; %in degrees
         numberOfParticles;
         particles;
-        %directivity;
-        %freqResponse;
-        %diaphragmRadius;
-        %nearFieldBorder;
     end
     %--------------
     %Constants
@@ -23,10 +17,8 @@ classdef Source3dModel < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Source3dModel(positionVector, azimuthDirectionAngle, elevationDirectionAngle)
+        function this = Source3dModel(positionVector)
             this.positionVector = positionVector;
-            this.azimuthDirectionAngle = azimuthDirectionAngle;
-            this.elevationDirectionAngle = elevationDirectionAngle;
             radius = 1; %sfera jednostkowa
             this.shape = Sphere3d(positionVector, radius);
             this.numberOfParticles = 0;
@@ -52,10 +44,14 @@ classdef Source3dModel < handle
             tic
             
             particlesLocal = this.particles;
-            parfor j = 1:length(particlesLocal)
-                particle = particlesLocal(j);
-                particle.shoot(simulationContext);
-                particlesLocal(j) = particle;
+            try
+                parfor j = 1:length(particlesLocal)
+                    particle = particlesLocal(j);
+                    particle.shoot(simulationContext);
+                    particlesLocal(j) = particle;
+                end
+            catch ME
+                throw(ME);
             end
             
             this.particles = particlesLocal;
@@ -72,12 +68,6 @@ classdef Source3dModel < handle
         %Getters
         function positionVector = getPositionVector(this)
             positionVector = this.positionVector;
-        end
-        function azimuthDirectionAngle = getAzimuthDirectionAngle(this)
-            azimuthDirectionAngle = this.azimuthDirectionAngle;
-        end
-        function elevationDirectionAngle = getElevationDirectionAngle(this)
-            elevationDirectionAngle = this.elevationDirectionAngle;
         end
         function particles = getParticles(this)
             particles = this.particles;
@@ -111,8 +101,6 @@ classdef Source3dModel < handle
                 z = sin(phi) * r;
                 
                 directionVectors(i+1) = Vec3d(x, y, z);
-                %fprintf(1, 'Length of calculated dir vector: %d\n', directionVectors(i+1).getLength());
-                %directionVectors(i+1).print();
             end
         end
     end

@@ -16,10 +16,9 @@ classdef Wall3d < handle
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Wall3d(faces, material, id)
+        function this = Wall3d(faces, id)
             if (nargin > 0)
                 this.faces = faces;
-                this.material = material;
                 this.id = id;
             end
         end
@@ -36,6 +35,10 @@ classdef Wall3d < handle
         end
         function material = getMaterial(this)
             material = this.material;
+        end
+        
+        function setMaterial(this, material)
+            this.material = material;
         end
         
         function appendFace (this, face)

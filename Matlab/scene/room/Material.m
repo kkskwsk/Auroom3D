@@ -4,7 +4,6 @@ classdef Material < handle %<attenuator
     %--------------
     properties (GetAccess = 'private', SetAccess = 'private')
         name;
-        color;
         filter;
     end
     %--------------
@@ -16,18 +15,14 @@ classdef Material < handle %<attenuator
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Material(name, color, filter)
+        function this = Material(name, filter)
             this.name = name;
-            this.color = color;
             this.filter = filter;
         end
         
         %Getters
         function name = getName(this)
             name = this.name;
-        end
-        function color = getColor(this)
-            color = this.color;
         end
         function filter = getFilter(this)
             filter = this.filter;

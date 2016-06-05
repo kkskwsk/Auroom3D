@@ -26,20 +26,17 @@ classdef ImageSource3d < handle
         function wallFilter = getWallFilter(this)
             wallFilter = this.wallFilter;
         end
-        
     end
     
     methods (Access = 'private')
         function calcFilter(this)
-            %consider angle on source
-            %neglected because of complicated translations
             resultImpulseResponse = 1;
             
             for i = 1:length(this.walls)
                 tempFilter = this.walls(i).getMaterial().getFilter();
                 resultImpulseResponse = Dsp.filter(resultImpulseResponse, tempFilter);
             end
-            this.wallFilter = Filter(1, resultImpulseResponse, 44100, 'filter');
+            this.wallFilter = Filter(1, resultImpulseResponse, 44100);
         end
     end
     
