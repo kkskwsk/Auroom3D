@@ -1,4 +1,4 @@
 function sizeInPixels = calcSizeInPixels(meters)
-    pixel2meterRatio = 200/1; %200 px = 1 m
+    global pixel2meterRatio;
     sizeInPixels = meters * pixel2meterRatio;
 end

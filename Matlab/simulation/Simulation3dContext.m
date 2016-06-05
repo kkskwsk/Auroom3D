@@ -1,115 +1,131 @@
 classdef Simulation3dContext < handle
-    %--------------
-    %This is a context class for the whole simulation.
-    %--------------
     properties (GetAccess = 'private', SetAccess = 'private')
-        roomModel;
-        sourceModel;
-        receiverModel;
         settings;
         distanceThreshold;
         speedOfSound;
+        
+        roomModel;
+        sourceModel;
+        receiverModel;
         materialsMap;
-        %filtersMap;
+        hrtf;
         
         leftEarFilter;
         rightEarFilter;
         
-        recalcGeometryFlag = true;
-        recalcIrFlag = true;
-        attenuationOnHead = false; 
-        pauseAuralization = false;
-        stopAuralization = false;
-        isAuralizationRunning = false;
-        
-        hrtf;
+        recalcGeometryFlag      =   true;
+        recalcIrFlag            =   true;
+        attenuationOnHead       =   false; 
+        pauseAuralization       =   false;
+        stopAuralization        =   false;
+        isAuralizationRunning   =   false;
+        isMaterialSet           =   false;
     end
-    %--------------
-    %Public Methods
-    %--------------
+    
     methods (Access = 'public')
         function this = Simulation3dContext()
-            %this.initializeFilters();
             this.initSettings();
-            this.hrtf = Hrtf.loadHrtf();
-            this.roomModel = [];
-            this.sourceModel = [];
-            this.receiverModel = [];
-            this.materialsMap = containers.Map('KeyType', 'char', 'ValueType', 'any');
-            %Simulation settings class is necessary
-            this.distanceThreshold = [];
-            this.speedOfSound = this.settings.simulation.speedOfSound;
-        end
-       
-        function setAttenuationOnHead(this, value)
-            this.attenuationOnHead = value;
+            this.distanceThreshold  =   []; 
+            this.speedOfSound       =   this.settings.simulation.speedOfSound;
+            
+            this.roomModel      =   [];
+            this.sourceModel    =   [];
+            this.receiverModel  =   [];
+            this.materialsMap   =   containers.Map('KeyType', 'char', 'ValueType', 'any');
+            this.hrtf           =   Hrtf.loadHrtf();
         end
         
-        function setIrLength(this, time)
-            this.distanceThreshold = time * this.settings.simulation.speedOfSound;
+        function createRoomModel(this, vertices, faces)
+            try
+                this.roomModel  =   Room3dModel(vertices, faces);
+            catch ME
+                this.roomModel  =   [];
+                throw ME;
+            end
+        end
+        function createSourceModel(this, positionVector)
+            this.sourceModel    =   Source3dModel(positionVector);
+        end
+        function createReceiverModel(this, positionVector, azimuth, size)
+            this.receiverModel  =   Receiver3dModel(positionVector, azimuth, size, this.hrtf);
         end
         
         function setParticlesNumber(this, numberOfParticles)
             if ~isempty(this.sourceModel) 
                 this.sourceModel.setNumberOfParticles(numberOfParticles);
             else
-                msgID = 'SIMCTX:EmptySourceModel';
-                msg = 'Initialize source model first!';
-                exception = MException(msgID, msg);
+                msgID       =   'SIMCTX:EmptySourceModel';
+                msg         =   'Initialize source model first!';
+                exception   =   MException(msgID, msg);
                 throw(exception);
             end
+        end
+       
+        function setIrLength(this, time)
+            this.distanceThreshold  =   time * this.settings.simulation.speedOfSound;
+        end
+        function setAttenuationOnHead(this, value)
+            this.attenuationOnHead  =   value;
         end
         
         function addMaterial(this, material)
-            this.materialsMap(material.getName()) = material;
+            this.materialsMap(material.getName())   =   material;
         end
-        
         function deleteMaterial(this, name)
-            this.materialsArray(name) = [];
+            this.materialsArray(name)   =   [];
         end
-        
         function setMaterial(this, name)
             if ~isempty(this.roomModel)
                 this.roomModel.setWallMaterial(this.materialsMap(name));
+                this.isMaterialSet  =   true;
             else
-                msgID = 'SIMCTX:EmptyRoomModel';
-                msg = 'Initialize room model first!';
-                exception = MException(msgID, msg);
+                msgID       =   'SIMCTX:EmptyRoomModel';
+                msg         =   'Initialize room model first!';
+                exception   =   MException(msgID, msg);
                 throw(exception);
             end
         end
-            
-        
-        function createRoomModel(this, vertices, faces)
-            try
-                this.roomModel = Room3dModel(vertices, faces);
-            catch ME
-                this.roomModel = [];
-                throw ME;
-            end
-        end
-        
-        function createSourceModel(this, positionVector)
-            this.sourceModel = Source3dModel(positionVector);
-        end
-        
-        function createReceiverModel(this, positionVector, azimuth, realSize)
-            this.receiverModel = Receiver3dModel(positionVector, azimuth, realSize, this.hrtf);
-        end
         
         function setRecalcGeometryFlag(this, value)
-            this.recalcGeometryFlag = value;
+            this.recalcGeometryFlag     =   value;
         end
-        
         function setRecalcIrFlag(this, value)
-            this.recalcIrFlag = value;
+            this.recalcIrFlag   =   value;
         end
         
         function start(this)
+            if isempty(this.roomModel)
+                msgID       =   'SIMCTX:EmptyRoomModel';
+                msg         =   'Initialize room first!';
+                exception   =   MException(msgID, msg);
+                throw(exception);
+            end
+            
             if isempty(this.sourceModel)
-                msgID = 'SIMCTX:EmptySrcModel';
-                msg = 'Initialize source first!';
-                exception = MException(msgID, msg);
+                msgID       =   'SIMCTX:EmptySrcModel';
+                msg         =   'Initialize source first!';
+                exception   =   MException(msgID, msg);
+                throw(exception);
+            end
+            
+            if isempty(this.receiverModel)
+                msgID       =    'SIMCTX:EmptyRecModel';
+                msg         =    'Initialize receiver first!';
+                exception   =    MException(msgID, msg);
+                throw(exception);
+            end
+            
+            if isempty(this.distanceThreshold)
+                msgID       =    'SIMCTX:EmptyThreshold';
+                msg         =    'Impulse response length is not set yet.';
+                exception   =    MException(msgID, msg);
+                throw(exception);
+            end
+            
+            if ~this.isMaterialSet
+                msgID       =    'SIMCTX:EmptyMaterial';
+                msg         =    'Room material is not set yet.';
+                exception   =    MException(msgID, msg);
                 throw(exception);
             end
             
@@ -120,18 +136,19 @@ classdef Simulation3dContext < handle
                     throw(ME);
                 end
             end
+            
             this.calcImpulseResponse();
-            this.recalcGeometryFlag = false;
-            this.recalcIrFlag = false;
+            this.recalcGeometryFlag     =   false;
+            this.recalcIrFlag           =   false;
         end
         
         function calcImpulseResponse(this)
-            impulse = [1];
-            particles = this.sourceModel.getParticles();
-            leftChannel = 0;
-            rightChannel = 0;
-            imageSourcesCounter = 0;
-            allReceptions = Reception.empty(0);
+            impulse                 =   [1];
+            particles               =   this.sourceModel.getParticles();
+            leftChannel             =   0;
+            rightChannel            =   0;
+            imageSourcesCounter     =   0;
+            allReceptions           =   Reception.empty(0);
             
             if this.attenuationOnHead
                 for i = 1:length(particles)
@@ -143,11 +160,9 @@ classdef Simulation3dContext < handle
                 for i = 1:length(particles)
                     if particles(i).isReceived()
                         allReceptions = [allReceptions particles(i).getReceptions()];
-                        %allReceptions(end + 1) = particles(i).getReceptions();
                     end
                 end
             end
-            
             
             for i = 1:length(allReceptions)
                 rec = allReceptions(i);
@@ -158,6 +173,7 @@ classdef Simulation3dContext < handle
                     end
                 end
             end
+            
             leftContainer = Handler.empty(0);%zeros(1, length(particles));
             rightContainer = Handler.empty(0);%zeros(1, length(particles));
             
@@ -165,223 +181,219 @@ classdef Simulation3dContext < handle
                 leftContainer(i) = Handler([]);
                 rightContainer(i) = Handler([]);
             end
-            %allReceptions(allReceptions == 0) = [];
-            %parfor
-            parfor i = 1:length(allReceptions)
-                reception = allReceptions(i);
+            
+            h       =   waitbar(0, 'Calculating binaural room impulse response.');
+            recNum  =   length(allReceptions);
+            step    =   0;
+            
+            for i = 1:recNum
+                left        =   0;
+                right       =   0;
+                step        =   step + 1;
+                reception   =   allReceptions(i);
+                waitbar(step/recNum);
+                
                 if reception.getDistance() == 0
                     continue;
                 end
-                left = 0;
-                right = 0;
-                imageSourcesCounter = imageSourcesCounter + 1;
-                imageSource = ImageSource3d(reception);
+                
+                imageSourcesCounter     =   imageSourcesCounter + 1;
+                imageSource             =   ImageSource3d(reception);
                 [leftEarImpulseResponse, rightEarImpulseResponse] = this.receiverModel.binauralize(imageSource, impulse, this);
-                left = Dsp.addBuffers(left, leftEarImpulseResponse);
-                right = Dsp.addBuffers(right, rightEarImpulseResponse);
-                hnd = leftContainer(i);
+                
+                left    =   Dsp.addBuffers(left, leftEarImpulseResponse);
+                right   =   Dsp.addBuffers(right, rightEarImpulseResponse);
+                
+                hnd     =   leftContainer(i);
                 hnd.setProperty(left);
-                leftContainer(i) = hnd;
-                hnd = rightContainer(i);
+                leftContainer(i)    =   hnd;
+                
+                hnd     =   rightContainer(i);
                 hnd.setProperty(right);
-                rightContainer(i) = hnd;
+                rightContainer(i)   =   hnd;
                 
             end
             
+            close(h);
+            
             for i = 1:length(leftContainer);
-                leftProp = leftContainer(i).getProperty();
-                rightProp = rightContainer(i).getProperty();
+                leftProp    =   leftContainer(i).getProperty();
+                rightProp   =   rightContainer(i).getProperty();
+                
                 if isempty(leftProp) || isempty(rightProp)
                     continue;
                 end
-                leftChannel = Dsp.addBuffers(leftChannel, leftProp);
-                rightChannel = Dsp.addBuffers(rightChannel, rightProp);
+                
+                leftChannel     =   Dsp.addBuffers(leftChannel, leftProp);
+                rightChannel    =   Dsp.addBuffers(rightChannel, rightProp);
             end
-%             
-%             parfor i = 1:length(particles)
-%                 soundParticle = particles(i);
-%                 if soundParticle.isReceived()
-%                     receptions = soundParticle.getReceptions();
-%                     left = 0;
-%                     right = 0;
-%                     for j = 1:min(2, length(receptions))%length(receptions)
-%                         if this.isImageSourceConsidered(soundParticle, j)
-%                             continue;
-%                         end
-%                         imageSourcesCounter = imageSourcesCounter + 1;
-%                         imageSource = ImageSource3d(soundParticle, j);
-%                         this.imageSources = [this.imageSources imageSource];
-%                         [leftEarImpulseResponse, rightEarImpulseResponse] = this.receiverModel.binauralize(imageSource, impulse, this);
-%                         left = Dsp.addBuffers(left, leftEarImpulseResponse);
-%                         right = Dsp.addBuffers(right, rightEarImpulseResponse);
-%                     end
-%                 end
-%                 leftContainer(i) = left;
-%                 rightContainer(i) = right;
-%             end
-%             
-%             for i = 1:length(leftContainter)
-%                 leftChannel = Dsp.addBuffers(leftChannel, leftContainer(i));
-%                 rightChannel = Dsp.addBuffers(rightChannel, rightContainer(i));
-%             end
             
-            fprintf(1, 'Image sources processing time: %d [sec]\n', toc);
-            time = 1/44100:1/44100:length(leftChannel)/44100;
-            this.leftEarFilter = Filter(1, leftChannel, 44100);
-            this.rightEarFilter = Filter(1, rightChannel, 44100);
-            figure();
+            time                    =   1/this.settings.auralization.samplingRate:(1/this.settings.auralization.samplingRate):(length(leftChannel)/this.settings.auralization.samplingRate);
+            this.leftEarFilter      =   Filter(1, leftChannel, this.settings.auralization.samplingRate);
+            this.rightEarFilter     =   Filter(1, rightChannel, this.settings.auralization.samplingRate);
+            
+            figure(1);
             plot(time, leftChannel);
             title('Left channel IR');
-            figure();
+            figure(2);
             plot(time, rightChannel);
             title('Right channel IR');
-            imageSourcesCounter
+            
+            message     =   sprintf('Image sources number: %d', imageSourcesCounter);
+            msgbox(message, 'Info');
         end
         
-        function stopAural(this)
-            this.stopAuralization = true;
-        end
-        
-        function pauseAural(this)
-            this.pauseAuralization = true;
-        end
-        
-        function resumeAural(this)
-            this.pauseAuralization = false;
-        end
-        
-        function auralize(this, filename, frameLength, leftEarFilter, rightEarFilter)
-            this.stopAuralization = false;
-            fileReader = dsp.AudioFileReader(filename, 'SamplesPerFrame', frameLength);
-            i = info(fileReader);
-            this.isAuralizationRunning = true;
+        function auralize(this, filename, frameLength, leftEarFilter, rightEarFilter, writeToFile)
+            this.stopAuralization       =   false;
+            this.isAuralizationRunning  =   true;
+            auralizedFilename           =   'auralized.wav';
+            path                        =   sprintf('../sounds/%s',filename);
+            fileReader                  =   dsp.AudioFileReader(path, 'SamplesPerFrame', frameLength);
+            i                           =   info(fileReader);
+            
             if (i.NumChannels ~= 1)
                 error('To many channels. Cannot auralize a stereo sound. First convert to mono.');
             end
             
-            %TO DO: Check how to choose a device? Speakers/file. It is
-            %necessary to choose if the sound should be played or just
-            %saved to a new file.
-            deviceWriter = audioDeviceWriter('SampleRate', fileReader.SampleRate);
+            if ~writeToFile
+                writer  =   audioDeviceWriter('SampleRate', fileReader.SampleRate);
+            else
+                writer      =   dsp.AudioFileWriter(auralizedFilename, 'SampleRate', 44100);
+                h           =   dir(path);
+                fileSize    =   h.bytes/2;
+                wb          =   waitbar(0, sprintf('Auralizing and writing to file %s', auralizedFilename));
+                wbstep      =   0;
+            end
             
-            %I assume that both ears' impulse responses are of equal
-            %length.
-            impulseResponseLength = length(leftEarFilter.getCoeffsB());
+            impulseResponseLength   =   length(leftEarFilter.getCoeffsB());
             
             if (impulseResponseLength ~= 1)
-                overlapLength = impulseResponseLength - 1;
-                leftEarOverlap  = zeros(overlapLength, 1);
-                rightEarOverlap = zeros(overlapLength, 1);
+                overlapLength       =   impulseResponseLength - 1;
+                leftEarOverlap      =   zeros(overlapLength, 1);
+                rightEarOverlap     =   zeros(overlapLength, 1);
                 
-                while ~isDone(fileReader) && (~this.stopAuralization)
-                    rightEarOverlap = [rightEarOverlap; zeros(frameLength - overlapLength, 1)];
-                    leftEarOverlap = [leftEarOverlap; zeros(frameLength - overlapLength, 1)];
+                while ~isDone(fileReader)
+                    rightEarOverlap     =   [rightEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    leftEarOverlap      =   [leftEarOverlap; zeros(frameLength - overlapLength, 1)];
+                    
                     if this.pauseAuralization
-                        chunk = zeros(1, frameLength);
+                        chunk   =   zeros(1, frameLength);
                     else
-                        chunk = step(fileReader);
+                        chunk   =   step(fileReader);
                     end
-                    processedLeftEarChunk = Dsp.filter(chunk, leftEarFilter);
-                    processedRightEarChunk = Dsp.filter(chunk, rightEarFilter);
-                    chunkToPlay(:,1) = leftEarOverlap(1:frameLength) + processedLeftEarChunk(1:frameLength);
-                    chunkToPlay(:,2) = rightEarOverlap(1:frameLength) + processedRightEarChunk(1:frameLength);
-                    leftEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
-                    rightEarOverlap(end+1:end+min(frameLength, overlapLength)) = 0;
-                    leftEarOverlap = processedLeftEarChunk(frameLength+1:end) + leftEarOverlap(frameLength+1:end);
-                    rightEarOverlap = processedRightEarChunk(frameLength+1:end) + rightEarOverlap(frameLength+1:end);
-                    play(deviceWriter, chunkToPlay);
+                    
+                    processedLeftEarChunk   =   Dsp.filter(chunk, leftEarFilter);
+                    processedRightEarChunk  =   Dsp.filter(chunk, rightEarFilter);
+                    chunkToPlay(:,1)        =   leftEarOverlap(1:frameLength) + processedLeftEarChunk(1:frameLength);
+                    chunkToPlay(:,2)        =   rightEarOverlap(1:frameLength) + processedRightEarChunk(1:frameLength);
+                    
+                    leftEarOverlap(end+1:end+min(frameLength, overlapLength))   =   0;
+                    rightEarOverlap(end+1:end+min(frameLength, overlapLength))  =   0;
+                    
+                    leftEarOverlap      =   processedLeftEarChunk(frameLength+1:end) + leftEarOverlap(frameLength+1:end);
+                    rightEarOverlap     =   processedRightEarChunk(frameLength+1:end) + rightEarOverlap(frameLength+1:end);
+                    
+                    if writeToFile
+                        wbstep  =   wbstep + frameLength;
+                        waitbar(wbstep/fileSize);
+                        step(writer, chunkToPlay);
+                    else
+                        play(writer, chunkToPlay);
+                    end
                 end
             else
-                while ~isDone(fileReader) && (~this.stopAuralization)
-                    if this.pauseAuralization
-                        chunk = zeros(1, frameLength);
+                while ~isDone(fileReader)
+                    chunk               =   step(fileReader);
+                    chunkToPlay(:,1)    =   Dsp.filter(chunk, leftEarFilter);
+                    chunkToPlay(:,2)    =   Dsp.filter(chunk, rightEarFilter);
+                    
+                    if writeToFile
+                        wbstep = wbstep + frameLength;
+                        waitbar(wbstep/fileSize);
+                        step(writer, chunkToPlay);
                     else
-                        chunk = step(fileReader);
+                        play(writer, chunkToPlay);
                     end
-                    chunkToPlay(:,1) = Dsp.filter(chunk, leftEarFilter);
-                    chunkToPlay(:,2) = Dsp.filter(chunk, rightEarFilter);
-                    play(deviceWriter, chunkToPlay);
                 end
             end
             
-            this.isAuralizationRunning = false;
+            if writeToFile
+                close(wb);
+            end
+            
+            release(fileReader);
+            release(writer);
+            
+            this.isAuralizationRunning  =   false;
+        end
+        
+        function filename = saveBinauralImpulseResponseToFile(this)
+            if isempty(this.leftEarFilter) || isempty(this.rightEarFilter)
+                msgID       =   'SIMCTX:EmptyFilters';
+                msg         =   'No impulse responses found. Simulate first, then save.';
+                exception   =   MException(msgID, msg);
+                throw(exception);
+            end
+            
+            filename        =   'impulseresp.wav';
+            leftBuf         =   this.leftEarFilter.getCoeffsB();
+            rightBuf        =   this.rightEarFilter.getCoeffsB();
+            finalBuf(:, 1)  =   leftBuf;
+            finalBuf(:, 2)  =   rightBuf;
+            
+            audiowrite(filename, finalBuf, this.leftEarFilter.getFs());
         end
         
         %Getters
         function roomModel = getRoomModel(this)
-            roomModel = this.roomModel;
+            roomModel           =   this.roomModel;
         end
         
         function receiverModel = getReceiverModel(this)
-            receiverModel = this.receiverModel;
+            receiverModel       =   this.receiverModel;
         end
         
         function distanceThreshold = getDistanceThreshold(this)
-            distanceThreshold = this.distanceThreshold;
+            distanceThreshold   =   this.distanceThreshold;
         end
         
         function speedOfSound = getSpeedOfSound(this)
-            speedOfSound = this.speedOfSound;
+            speedOfSound        =   this.speedOfSound;
         end
         
         function settings = getSettings(this)
-            settings = this.settings;
+            settings            =   this.settings;
         end
         
         function result = isAuralRunning(this)
-            result = this.isAuralizationRunning;
+            result              =   this.isAuralizationRunning;
         end
         
         function [leftEarFilter, rightEarFilter] = getFilters(this)
-            leftEarFilter = this.leftEarFilter;
-            rightEarFilter = this.rightEarFilter;
+            leftEarFilter   =   this.leftEarFilter;
+            rightEarFilter  =   this.rightEarFilter;
         end
-                
+        
+        function setFilters(this, filename)
+            [buffers, fs]   =   audioread(filename);
+            
+            if fs ~= this.settings.auralization.samplingRate
+                msgID       =   'SIMCTX:BadSamplingRate';
+                message     =   sprintf('You should use a file with sampling rate of %d Hz', this.settings.auralization.samplingRate);
+                exception   =   MException(msgID, message);
+                throw(exception);
+            end
+            
+            this.leftEarFilter      =   Filter(1, buffers(:,1), fs);
+            this.rightEarFilter     =   Filter(1, buffers(:,2), fs);
+        end
     end
-    %--------------
-    %Private Methods
-    %--------------
+    
     methods (Access = 'private')
         function initSettings(this)
-            %this.settings.roomModel.vertices = [[50 100 0]; [1250 100 0]; [1250 1600 0]; [50 1600 0]; [50 100 600]; [1250 100 600]; [1250 1600 600]; [50 1600 600]];
-            %this.settings.roomModel.faces = [1 2 3; 1 3 4; 1 6 2; 1 5 6; 2 6 3; 3 6 7; 3 7 4; 4 7 8; 5 7 6; 5 8 7; 1 4 5; 4 8 5];
-            %material = Material('wood', this.filtersMap('woodenWall'));
-%             this.settings.roomModel.materials = [material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material, ...
-%                                                 material];
-            
-%             this.settings.sourceModel.positionX = 500;
-%             this.settings.sourceModel.positionY = 1000;
-%             this.settings.sourceModel.positionZ = 300; %zmieniæ podawanie pozycji - w metrach
-%             this.settings.sourceModel.positionVector = Vec3d(this.settings.sourceModel.positionX, this.settings.sourceModel.positionY, this.settings.sourceModel.positionZ);
-            
-%             this.settings.receiverModel.positionX = 500;
-%             this.settings.receiverModel.positionY = 500;
-%             this.settings.receiverModel.positionZ = 300;
-%             this.settings.receiverModel.positionVector = Vec3d(this.settings.receiverModel.positionX, this.settings.receiverModel.positionY, this.settings.receiverModel.positionZ);
-%             this.settings.receiverModel.directionAngle.azimuth = 180; %in degrees
-%             this.settings.receiverModel.realSize = 1; %in meters
-            
-            this.settings.simulation.temperature = 21; %Celsius
-            this.settings.simulation.speedOfSound = 331.5 + 0.6*this.settings.simulation.temperature; %m/s
-            
+            this.settings.auralization.samplingRate     =   44100;                                              %Hz
+            this.settings.simulation.temperature        =   21;                                                 %Celsius
+            this.settings.simulation.speedOfSound       =   331.5 + 0.6*this.settings.simulation.temperature;   %m/s
         end
-        
-        %function initializeFilters(this)
-        %    this.filtersMap = containers.Map('KeyType','char','ValueType','any');
-        %    this.filtersMap('woodenWall') = Filter(1, -0.9, 44100);%, 'wood'); %[0; 0; 0; 0.1; 0.2; 0.3; 0.2; 0.1; 0; 0; 0]
-        %end
-        
-        
-        
     end
 end

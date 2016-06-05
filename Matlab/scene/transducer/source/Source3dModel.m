@@ -42,17 +42,25 @@ classdef Source3dModel < handle
                 this.particles(i) = particle;
             end
             tic
-            
+            h = waitbar(0, 'Performing ray tracing.');
             particlesLocal = this.particles;
+            particlesNum = length(particlesLocal);
+            step = 0;
             try
-                parfor j = 1:length(particlesLocal)
+                %parfor
+                for j = 1:particlesNum
+                    step = step + 1;
+                    waitbar(step/particlesNum);
                     particle = particlesLocal(j);
                     particle.shoot(simulationContext);
                     particlesLocal(j) = particle;
                 end
             catch ME
+                close(h);
                 throw(ME);
             end
+            
+            close(h);
             
             this.particles = particlesLocal;
             fprintf('time of full processing: %d [sec]\n', toc);

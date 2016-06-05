@@ -19,16 +19,14 @@ classdef Receiver3dModel < handle %mog³oby dziedziczyæ po Transducer
     %--------------
     methods (Access = 'public')
         %Constructor
-        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, realSize, hrtf)
+        function this = Receiver3dModel(positionVector, azimuthDirectionAngle, size, hrtf)
             this.positionVector = positionVector;
             this.azimuthDirectionAngle = azimuthDirectionAngle;
-            this.realSize = realSize;
-            radius = calcSizeInPixels(this.realSize);
+            this.realSize = calcSizeInMeters(size);
+            radius = size;
             this.shape = Sphere3d(positionVector, radius);
-            tic
             hrtf.init(this);
             this.hrtf = hrtf;
-            fprintf(1, 'Time of initing HRTF: %d [sec]\n', toc);
         end
         
         function [isTrue, len] = intersect(this, ray)

@@ -25,12 +25,12 @@ classdef Room3dModel < handle
             
             for i = 1:length(UIDs)
                 if length(edgesByUID(edgesByUID == i)) < 2
-                    fprintf(1, 'There is a hole!\n');
+                    msgbox('Room loading failed. We found a hole.', 'Error', 'error');
                     result = false;
                     return
                 end
             end 
-            fprintf(1, 'No holes found!\n');
+            msgbox('Room loading successful.', 'Success');
             result = true;
         end
     end
@@ -72,6 +72,7 @@ classdef Room3dModel < handle
                 end
                 alreadyAppended = false;
             end
+            drawMesh(faces, vertices);
         end
         
         function setWallMaterial(this, material)

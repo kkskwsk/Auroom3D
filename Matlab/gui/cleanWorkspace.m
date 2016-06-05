@@ -1,0 +1,2 @@
+configCleanPath;    
+rmpath config;

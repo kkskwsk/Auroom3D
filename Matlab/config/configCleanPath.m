@@ -4,3 +4,7 @@ for i = 1:length(directoriesToAdd)
     fprintf(1, 'Removing dir: %s\n', directoriesToAdd{i});
     rmpath(directoriesToAdd{i});
 end
+
+clear classes;
+clear all;
+close all;

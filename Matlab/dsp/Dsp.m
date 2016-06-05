@@ -1,6 +1,4 @@
 classdef Dsp
-    %DSP operations module
-    
     properties
     end
     
@@ -14,41 +12,40 @@ classdef Dsp
         end
         
         function result = timeDomainConv(s, h)
-            result = conv(s, h);
+            result      =   conv(s, h);
         end
         
         %cyclic (FFT) convolution
         function result = freqDomainConv(s, h)
-            sLength = length(s);
-            hLength = length(h);
+            sLength     =   length(s);
+            hLength     =   length(h);
             
             %Append zeros in the end for the same length (cyclic
             %convolution)
-            s = [s; zeros(hLength - 1, 1)];
-            h = [h; zeros(sLength - 1, 1)];
+            s   =   [s; zeros(hLength - 1, 1)];
+            h   =   [h; zeros(sLength - 1, 1)];
             
-            s_spk = fft(s);
-            h_spk = fft(h);
+            s_spk   =   fft(s);
+            h_spk   =   fft(h);
             
-            result_spk = s_spk .* h_spk;
+            result_spk  =   s_spk .* h_spk;
             
-            result = ifft(result_spk);
+            result  =   ifft(result_spk);
         end
         
         function buffer = addBuffers(a, b)
-            len1 = length(a);
-            len2 = length(b);
+            len1    =   length(a);
+            len2    =  length(b);
+            
             if len1 ~= len2
                 if len2 > len1
-                    a = padarray(a, [len2-len1 0], 0, 'post');
+                    a   =   padarray(a, [len2-len1 0], 0, 'post');
                 else
-                    b = padarray(b, [len1-len2 0], 0, 'post');
+                    b   =   padarray(b, [len1-len2 0], 0, 'post');
                 end
             end
             
-            buffer = a + b;
+            buffer  =   a + b;
         end
-        
     end
 end
-
