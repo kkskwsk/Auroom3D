@@ -1,6 +1,6 @@
-sourceDirectoriesToAdd = [{'../dsp'}, {'../dsp/air'}, {'../dsp/directivity'}, {'../geometry'}, {'../main'}, {'../scene'}, {'../scene/room'}, {'../scene/transducer'}, {'../scene/transducer/receiver'}, {'../scene/transducer/source'}, {'../simulation'}, {'../utils'}];
+sourceDirectoriesToAdd = [{'../bir'}, {'../dsp'}, {'../dsp/air'}, {'../dsp/directivity'}, {'../geometry'}, {'../materials'}, {'../rooms'},  {'../scene'}, {'../scene/room'}, {'../scene/transducer'}, {'../scene/transducer/receiver'}, {'../scene/transducer/source'}, {'../simulation'}, {'../sounds'}, {'../utils'}];
 multimediaDirectoriesToAdd = [{'../../../multimedia/used'}, {'../../../doc/hrtf/MIT KEMAR/full/elev0'}];
-hrtfPattern = '../../../doc/hrtf/MIT KEMAR/full/elev%d';
+hrtfPattern = '../hrtf/MIT KEMAR/full/elev%d';
 for i = -40:10:90
     addpath(sprintf(hrtfPattern, i));
 end

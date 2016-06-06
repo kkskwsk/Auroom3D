@@ -15,216 +15,157 @@ classdef Hrtf < handle
     
     methods (Access = 'public')
         function this = Hrtf()
-            this.anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+            this.anglesMap  =   containers.Map('KeyType', 'double', 'ValueType', 'any');
             Hrtf.fillAnglesMap(this.anglesMap);
-            [leftEarFilenamePattern, rightEarFilenamePattern] = Hrtf.createFilenamePatterns();
+            [leftEarFilenamePattern, rightEarFilenamePattern]   =   Hrtf.createFilenamePatterns();
             this.loadFilters(this.anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
-%             this.receiverModel = receiverModel;
-%             anglesMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
-%             Hrtf.fillAnglesMap(anglesMap);
-%             [leftEarFilenamePattern, rightEarFilenamePattern] = Hrtf.createFilenamePatterns();
-%             this.initFilters(anglesMap, leftEarFilenamePattern, rightEarFilenamePattern);
-%             this.triangulate();
         end
         
         function init(this, receiverModel)
-            this.receiverModel = receiverModel;
+            this.receiverModel  =   receiverModel;
+            
             this.initFilters(this.anglesMap);
             this.triangulate();
         end
         
         function [leftEarFilter, rightEarFilter] = interpolate(this, headPositionVector, imageSource)
-            minLen = [];
-            imageSourcePositionVector = imageSource.getPositionVector();
-            directionVector = headPositionVector - imageSourcePositionVector;
-            directionVector = directionVector.normalize();
-            ray = Ray3d(imageSourcePositionVector, directionVector);
+            minLen                      =   [];
+            imageSourcePositionVector   =   imageSource.getPositionVector();
+            directionVector             =   headPositionVector - imageSourcePositionVector;
+            directionVector             =   directionVector.normalize();
+            ray                         =   Ray3d(imageSourcePositionVector, directionVector);
             
-%             parfor i = 1:length(this.faces)
-%                 [isTrue, len] = ray.intersectFace(this.faces(i));
-%                 if isTrue && (isempty(minLen) || minLen > len)
-%                     minLen = len;
-%                     triangle = this.triangles(i, :);
-%                 end
-%             end
             localFaces = this.faces;
-            %parfor!!!!!!!!!!
+            
             for i = 1:length(this.faces)
-                [isTrue(i), len(i)] = ray.intersectFace(localFaces(i));
+                [isTrue(i), len(i)]     =   ray.intersectFace(localFaces(i));
             end
             
             for i = find(isTrue)
                 if (isempty(minLen) || minLen > len(i))
-                    minLen = len(i);
-                    triangle = this.triangles(i, :);
+                    minLen              =   len(i);
+                    triangle            =   this.triangles(i, :);
                 end
             end
 
             ray.setLength(minLen);
-            intersectionPoint = ray.getEndVector();
+            intersectionPoint           =   ray.getEndVector();
             
            % Interpolation itself
-            S = [intersectionPoint.getX();...
-                 intersectionPoint.getY();...
-                 intersectionPoint.getZ()];
+            S   =   [intersectionPoint.getX();...
+                     intersectionPoint.getY();...
+                     intersectionPoint.getZ()];
              
-            H = [this.nodes(triangle(1)).getCoords(),...
-                 this.nodes(triangle(2)).getCoords(),...
-                 this.nodes(triangle(3)).getCoords()];
+            H   =   [this.nodes(triangle(1)).getCoords(),...
+                     this.nodes(triangle(2)).getCoords(),...
+                     this.nodes(triangle(3)).getCoords()];
              
-            g = H\S;%inv(H)*S;
+            g   = H\S;                                          %inv(H)*S;
             
-            resultLeftHRIR = g(1)*this.leftEarFiltersMap(triangle(1)).getProperty()...
-                           + g(2)*this.leftEarFiltersMap(triangle(2)).getProperty()...
-                           + g(3)*this.leftEarFiltersMap(triangle(3)).getProperty();
-            resultRightHRIR = g(1)*this.rightEarFiltersMap(triangle(1)).getProperty()...
-                           + g(2)*this.rightEarFiltersMap(triangle(2)).getProperty()...
-                           + g(3)*this.rightEarFiltersMap(triangle(3)).getProperty();
+            resultLeftHRIR  =   g(1)*this.leftEarFiltersMap(triangle(1)).getProperty()...
+                            +   g(2)*this.leftEarFiltersMap(triangle(2)).getProperty()...
+                            +   g(3)*this.leftEarFiltersMap(triangle(3)).getProperty();
+            resultRightHRIR =   g(1)*this.rightEarFiltersMap(triangle(1)).getProperty()...
+                            +   g(2)*this.rightEarFiltersMap(triangle(2)).getProperty()...
+                            +   g(3)*this.rightEarFiltersMap(triangle(3)).getProperty();
                        
-            leftEarFilter  = Filter(1, resultLeftHRIR, 44100);
-            rightEarFilter = Filter(1, resultRightHRIR, 44100);
-        end
-    end
-    
-    methods (Access = 'private', Static = true)
-        function fillAnglesMap(anglesMap)
-            azimuthAngles = [];
-            elevationAngles = -40:10:90;
-            for i = elevationAngles
-                if i == -40 || i == 40
-                    azimuthAngles = [0 6 13 19 26 32 39 45 51 58 64 71 77 ...
-                                     84 90 96 103 109 116 122 129 135 141 ...
-                                     148 154 161 167 174 180 186 193 199  ...
-                                     206 212 219 225 231 238 244 251 257  ...
-                                     264 270 276 283 289 296 302 309 315  ...
-                                     321 328 334 341 347 354]; 
-                elseif i == 90
-                    azimuthAngles = 0;
-                else
-                    if i == 0 || i == -10 || i == 10 || i == -20 || i == 20
-                        quant = 5;
-                    elseif i == -30 || i == 30
-                        quant = 6;
-                    elseif i == 50
-                        quant = 8;
-                    elseif i == 60
-                        quant = 10;
-                    elseif i == 70
-                        quant = 15;
-                    elseif i == 80
-                        quant = 30;
-                    end
-                    
-                    azimuthAngles = 0:quant:360-quant;
-                end
-                
-                %phis = Hrtf.convertHRPhiToGeneral(azimuthAngles);
-                %theta = Hrtf.convertHRThetaToGeneral(i);
-                %anglesMap(theta) = phis;
-                anglesMap(i) = azimuthAngles;
-            end
-        end
-        
-        function [leftEarFilenamePattern, rightEarFilenamePattern] = createFilenamePatterns()
-            leftEarFilenamePattern = 'L%1de%1.03da.wav';
-            rightEarFilenamePattern = 'R%1de%1.03da.wav';
+            leftEarFilter   =   Filter(1, resultLeftHRIR, 44100);
+            rightEarFilter  =   Filter(1, resultRightHRIR, 44100);
         end
     end
     
     methods (Access = 'private')
         function loadFilters(this, anglesMap, leftFilenamePattern, rightFilenamePattern)
-            this.leftBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
-            this.rightBuffers = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
-            
-%             wb = waitbar(0, 'Loading HRTF files. Please wait.');
-%             step = 0;
-            elevationAngles = keys(anglesMap);
-%             filesNumber = 0;
-%             for i = elevationAngles
-%                 i = cell2mat(i);
-%                 azimuthAngles = anglesMap(i);
-%                 for j = azimuthAngles
-%                     filesNumber = filesNumber + 1;
-%                 end
-%             end
-            
+            this.leftBuffers    =   containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            this.rightBuffers   =   containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            elevationAngles     =   keys(anglesMap);
+           
             for i = elevationAngles
-                i = cell2mat(i);
-                azimuthAngles = anglesMap(i);
-                leftTempMap = containers.Map('KeyType', 'int32', 'ValueType', 'any');
-                rightTempMap = containers.Map('KeyType', 'int32', 'ValueType', 'any');
+                i               =   cell2mat(i);
+                azimuthAngles   =   anglesMap(i);
+                leftTempMap     =   containers.Map('KeyType', 'int32', 'ValueType', 'any');
+                rightTempMap    =   containers.Map('KeyType', 'int32', 'ValueType', 'any');
+                
                 for j = azimuthAngles
-                    filenameLeft = sprintf(leftFilenamePattern, i, j);
-                    filenameRight = sprintf(rightFilenamePattern, i, j);
-                    leftTempMap(j) = Handler(audioread(filenameLeft));
-                    rightTempMap(j) = Handler(audioread(filenameRight));
-%                     step = step + 2;
-%                     waitbar(step/filesNumber);
+                    filenameLeft        =   sprintf(leftFilenamePattern, i, j);
+                    filenameRight       =   sprintf(rightFilenamePattern, i, j);
+                    leftTempMap(j)      =   Handler(audioread(filenameLeft));
+                    rightTempMap(j)     =   Handler(audioread(filenameRight));
                 end
-                this.leftBuffers(i) = leftTempMap;
-                this.rightBuffers(i) = rightTempMap;
+                
+                this.leftBuffers(i)     =   leftTempMap;
+                this.rightBuffers(i)    =   rightTempMap;
             end
-%             close(wb);
         end 
+        
         function initFilters(this, anglesMap)
-            this.leftEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
-            this.rightEarFiltersMap = containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
-            nodeCounter = int32(0);
-            this.nodes = Vec3d.empty(0);
+            this.leftEarFiltersMap      =   containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            this.rightEarFiltersMap     =   containers.Map('KeyType','int32','ValueType','any'); %Vec3d.ID -> filter
+            nodeCounter                 =   int32(0);
+            this.nodes                  =   Vec3d.empty(0);
+            radius                      =   this.receiverModel.getShape().getRadius();
+            translationVec              =   this.receiverModel.getPositionVector();
+            rotationAngle               =   this.receiverModel.getAzimuthDirectionAngle();
             
-            radius = this.receiverModel.getShape().getRadius();
-            translationVec = this.receiverModel.getPositionVector();
-            rotationAngle = this.receiverModel.getAzimuthDirectionAngle();
+            wb                  =   waitbar(0, 'Adjusting HRTFs to the new position. Please wait.');
+            elevationAngles     =   keys(anglesMap);
+            step                =   0;
+            filtersNumber       =   0;
             
-            wb = waitbar(0, 'Adjusting HRTFs to the new position. Please wait.');
-            elevationAngles = keys(anglesMap);
-            step = 0;
-            filtersNumber = 0;
             for i = elevationAngles
-                i = cell2mat(i);
-                azimuthAngles = anglesMap(i);
+                i               =   cell2mat(i);
+                azimuthAngles   =   anglesMap(i);
+                
                 for j = azimuthAngles
-                    filtersNumber = filtersNumber + 1;
+                    filtersNumber   =   filtersNumber + 1;
                 end
             end
             
             for i = elevationAngles
-                i = cell2mat(i);
-                leftAzimuth2BufferMap = this.leftBuffers(i);
-                rightAzimuth2BufferMap = this.rightBuffers(i);
-                azimuthAngles = anglesMap(i);
+                i                       =   cell2mat(i);
+                leftAzimuth2BufferMap   =   this.leftBuffers(i);
+                rightAzimuth2BufferMap  =   this.rightBuffers(i);
+                azimuthAngles           =   anglesMap(i);
+                
                 for j = azimuthAngles
-                    step = step + 1;
+                    step        =   step + 1;
                     waitbar(step/filtersNumber);
-                    nodeCounter = nodeCounter + int32(1);
-                    convPhi = Hrtf.convertHRPhiToGeneral(j);
-                    convTheta = Hrtf.convertHRThetaToGeneral(i);
-                    node = Vec3d.createWithSpherical(radius, convTheta, convPhi);
+                    nodeCounter =   nodeCounter + int32(1);
+                    convPhi     =   Hrtf.convertHRPhiToGeneral(j);
+                    convTheta   =   Hrtf.convertHRThetaToGeneral(i);
+                    node        =   Vec3d.createWithSpherical(radius, convTheta, convPhi);
+                    
                     node.rotate('z', rotationAngle);
-                    this.nodes(nodeCounter) = translationVec + node;
-                    this.leftEarFiltersMap(nodeCounter) = leftAzimuth2BufferMap(j);%audioread(filenameLeft);
-                    this.rightEarFiltersMap(nodeCounter) = rightAzimuth2BufferMap(j);
+                    this.nodes(nodeCounter)                 =   translationVec + node;
+                    this.leftEarFiltersMap(nodeCounter)     =   leftAzimuth2BufferMap(j);
+                    this.rightEarFiltersMap(nodeCounter)    =   rightAzimuth2BufferMap(j);
                 end
             end
             
             close(wb);
         end 
+        
         %Delaunay triangulation of measured HRTF points. To get surface triangles
         %a convex hull is then created. This operation is necessary for
         %HRTF interpolation.
         function triangulate(this)
-            this.faces = Face3d.empty(0);
-            nodesNum = length(this.nodes);
-            coordsMatrix  = zeros(nodesNum, 3);
+            this.faces      =   Face3d.empty(0);
+            nodesNum        =   length(this.nodes);
+            coordsMatrix    =   zeros(nodesNum, 3);
+            
             for i = 1:nodesNum
-                coordsMatrix(i, :) = this.nodes(i).getCoords();
+                coordsMatrix(i, :)  =   this.nodes(i).getCoords();
             end
-            DT = delaunayTriangulation(coordsMatrix);
-            this.triangles = DT.convexHull();
+            
+            DT              =   delaunayTriangulation(coordsMatrix);
+            this.triangles  =   DT.convexHull();
+            
             for i = 1:size(this.triangles, 1)
-                this.faces(i) = Face3d(this.nodes(this.triangles(i,1)), this.nodes(this.triangles(i,2)), this.nodes(this.triangles(i,3)));
+                this.faces(i)   =   Face3d(this.nodes(this.triangles(i,1)), this.nodes(this.triangles(i,2)), this.nodes(this.triangles(i,3)));
             end
-            faceColor  = [0.6875 0.8750 0.8984];
+            
+            faceColor   =   [0.6875 0.8750 0.8984];
+            
             figure(3);
             hold on;
             tetramesh(DT,'FaceColor', faceColor, 'FaceAlpha', 1);
@@ -235,36 +176,77 @@ classdef Hrtf < handle
         end
     end
     
-    methods (Access = 'public', Static = true)
-        function [theta, phi] = convertAnglesToGeneralCoords(thetaHR, phiHR)
-            theta = 90 - thetaHR;
-            phi = -phiHR;
+    methods (Access = 'private', Static = true)
+        function fillAnglesMap(anglesMap)
+            azimuthAngles       =   [];
+            elevationAngles     =   -40:10:90;
+            
+            for i = elevationAngles
+                if i == -40 || i == 40
+                    azimuthAngles   =   [0 6 13 19 26 32 39 45 51 58 64 71 77 ...
+                                         84 90 96 103 109 116 122 129 135 141 ...
+                                         148 154 161 167 174 180 186 193 199  ...
+                                         206 212 219 225 231 238 244 251 257  ...
+                                         264 270 276 283 289 296 302 309 315  ...
+                                         321 328 334 341 347 354]; 
+                elseif i == 90
+                    azimuthAngles   =   0;
+                else
+                    if i == 0 || i == -10 || i == 10 || i == -20 || i == 20
+                        quant       =   5;
+                    elseif i == -30 || i == 30
+                        quant       =   6;
+                    elseif i == 50
+                        quant       =   8;
+                    elseif i == 60
+                        quant       =   10;
+                    elseif i == 70
+                        quant       =   15;
+                    elseif i == 80
+                        quant       =   30;
+                    end
+                    
+                    azimuthAngles   =   0:quant:360-quant;
+                end
+                
+                anglesMap(i)    =   azimuthAngles;
+            end
         end
         
-        function [thetaHR, phiHR] = convertAnglesToHRCoords(theta, phi)
-            thetaHR = 90 - theta;
-            phiHR = -phi;
-        end
-        
-        function theta = convertHRThetaToGeneral(thetaHR)
-            theta = 90 - thetaHR;
-        end
-        function theta = convertHRPhiToGeneral(phiHR)
-            theta = -phiHR;
-        end
-        
-        function thetaHR = convertThetaToHR(theta)
-            thetaHR = 90 - theta;
-        end
-        
-        function phiHR = convertPhiToHR(phi)
-            phiHR = -phi;
+        function [leftEarFilenamePattern, rightEarFilenamePattern] = createFilenamePatterns()
+            leftEarFilenamePattern  =   'L%1de%1.03da.wav';
+            rightEarFilenamePattern =   'R%1de%1.03da.wav';
         end
     end
     
     methods (Access = 'public', Static = true)
         function hrtf = loadHrtf()
-            hrtf = Hrtf();
+            hrtf    =   Hrtf();
+        end
+        
+        function [theta, phi] = convertAnglesToGeneralCoords(thetaHR, phiHR)
+            theta   =   90 - thetaHR;
+            phi     =   -phiHR;
+        end
+        
+        function [thetaHR, phiHR] = convertAnglesToHRCoords(theta, phi)
+            thetaHR     =   90 - theta;
+            phiHR       =   -phi;
+        end
+        
+        function theta = convertHRThetaToGeneral(thetaHR)
+            theta       =   90 - thetaHR;
+        end
+        function phi = convertHRPhiToGeneral(phiHR)
+            phi         =   -phiHR;
+        end
+        
+        function thetaHR = convertThetaToHR(theta)
+            thetaHR     =   90 - theta;
+        end
+        
+        function phiHR = convertPhiToHR(phi)
+            phiHR       =   -phi;
         end
     end
 end
